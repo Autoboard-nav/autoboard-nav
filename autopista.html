@@ -549,7 +549,7 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v236 · AUTOPISTA (más zoom, carteles grandes, rayas fijas)</div>
+  <div class="seccion">Versión v237 · AUTOPISTA (ruta ancha en carril derecho, pórticos sobre la línea azul)</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -7510,11 +7510,15 @@ export function construir(ruta, cum, coords, D, m0, m1, tramos){
   for(let i=0;i<N;i++){ const q = laneEn(D,S[i].m); lq[i]=q; nS[i]=q?q.n:CFG.N_DEF; Wraw[i]=nS[i]*LANE; }
   const R = 18;   /* ±36 m de suavizado del ancho */
   for(let i=0;i<N;i++){ let a=0,c=0; for(let j=Math.max(0,i-R);j<=Math.min(N-1,i+R);j++){ a+=Wraw[j]; c++; } W[i]=a/c; }
+  /* la línea azul (ruta TomTom) va por el centro de la calzada: se desplaza todo el dibujo a la izquierda para que la ruta quede en el centro del carril derecho (o del último carril activo) */
+  const shRaw=new Array(N), sh=new Array(N);
+  for(let i=0;i<N;i++){ const q=lq[i], n=nS[i]; let k=n-1; if(q){ for(let z=q.lanes.length-1;z>=0;z--){ if(q.lanes[z].follow){ k=z; break; } } } shRaw[i]=-(n*LANE/2-(k+0.5)*LANE); }
+  for(let i=0;i<N;i++){ let a=0,c=0; for(let j=Math.max(0,i-R);j<=Math.min(N-1,i+R);j++){ a+=shRaw[j]; c++; } sh[i]=a/c; }
   /* ¿esta muestra es calzada de autopista (no rampa)? → solo ahí hay calzada de vuelta */
   const inicios=(a,b,tot)=>{ const P=tot*CFG.PASO, r=[]; for(let s=Math.max(a,1);s<=b;s++){ if(Math.floor(S[s].m/P)!==Math.floor(S[s-1].m/P)) r.push(s); } return r; };
   const enTramo = m => tramos.some(t=>m>=t.s0 && m<=t.s1);
 
-  const grupo = new T.Group();
+  const grupo = new T.Group(), alto = new T.Group();
   const colores = {
     asf:0x4a4e55, ars:0x6b6f6a, lin:0xf4f4ee, ret:0x5a5e66, linRet:0xd5d5cf, rail:0xaab0b8, poste:0x6a717c, lamp:0xdddddd
   };
@@ -7526,7 +7530,7 @@ export function construir(ruta, cum, coords, D, m0, m1, tramos){
   const acc = {}; const A = k => acc[k] || (acc[k]={pos:[],idx:[]});
   function tira(k, offA, offB, y, i0=0, i1=N-1){   /* offA/offB: (i)=>desplazamiento lateral (+ = izquierda) */
     const a = A(k), base = a.pos.length/3;
-    for(let i=i0;i<=i1;i++){ const {p,t}=S[i], l=left(t); const oa=offA(i), ob=offB(i);
+    for(let i=i0;i<=i1;i++){ const {p,t}=S[i], l=left(t); const oa=offA(i)+sh[i], ob=offB(i)+sh[i];
       a.pos.push(p.x+l.x*oa,y,p.z+l.z*oa, p.x+l.x*ob,y,p.z+l.z*ob); }
     for(let i=0;i<i1-i0;i++){ const b=base+i*2; a.idx.push(b,b+1,b+2,b+1,b+3,b+2); }
   }
@@ -7589,7 +7593,7 @@ export function construir(ruta, cum, coords, D, m0, m1, tramos){
   const railMat = new T.MeshBasicMaterial({color:colores.rail});
   const railG = new T.BoxGeometry(0.14,0.55,2.2);
   const posR = []; for(let i=0;i<N;i+=1){ const {p,t}=S[i], l=left(t), w=W[i];
-    posR.push([p,t,l,w/2+3.4], [p,t,l,-w/2-3.4]); }
+    posR.push([p,t,l,w/2+3.4+sh[i]], [p,t,l,-w/2-3.4+sh[i]]); }
   const rails = new T.InstancedMesh(railG,railMat,posR.length); rails.frustumCulled=false;
   { const m4=new T.Matrix4(), q=new T.Quaternion(), e=new T.Euler(), sc=new T.Vector3(1,1,1);
     posR.forEach(([p,t,l,off],k)=>{ e.set(0,Math.atan2(t.x,t.z),0); q.setFromEuler(e); m4.compose(new T.Vector3(p.x+l.x*off,0.65,p.z+l.z*off),q,sc); rails.setMatrixAt(k,m4); }); }
@@ -7603,7 +7607,7 @@ export function construir(ruta, cum, coords, D, m0, m1, tramos){
   postes.frustumCulled = heads.frustumCulled = false;
   { const m4=new T.Matrix4(), q=new T.Quaternion(), e=new T.Euler(), sc=new T.Vector3(1,1,1); let k=0;
     for(const i of idxL){ const {p,t}=S[i], l=left(t); for(const side of [1,-1]){
-      const off = side*(W[i]/2+3.9); e.set(0,Math.atan2(t.x,t.z),0); q.setFromEuler(e);
+      const off = side*(W[i]/2+3.9)+sh[i]; e.set(0,Math.atan2(t.x,t.z),0); q.setFromEuler(e);
       m4.compose(new T.Vector3(p.x+l.x*off,4.5,p.z+l.z*off),q,sc); postes.setMatrixAt(k,m4);
       m4.compose(new T.Vector3(p.x+l.x*off,9,p.z+l.z*off),q,sc); heads.setMatrixAt(k,m4); k++; } } }
   grupo.add(postes); grupo.add(heads);
@@ -7616,7 +7620,7 @@ export function construir(ruta, cum, coords, D, m0, m1, tramos){
     if(q.s1<m0||q.s0>m1||!q.lanes.length) continue;
     const pos = [q.s1-14, q.s1-34].filter(m=>m>q.s0);
     for(const mm of pos){ const i = muestraDe(mm); if(i<0) continue; const {p,t}=S[i], l=left(t);
-      q.lanes.forEach((ln,k)=>{ const act = !!ln.follow; const off = W[i]/2 - (k+0.5)*LANE;
+      q.lanes.forEach((ln,k)=>{ const act = !!ln.follow; const off = W[i]/2 - (k+0.5)*LANE + sh[i];
         const m = meshSimple(new T.PlaneGeometry(1.5,3),flechaTex(act));
         m.position.set(p.x+l.x*off,Y.flecha,p.z+l.z*off);
         const yaw = new T.Quaternion().setFromAxisAngle(new T.Vector3(0,1,0),Math.atan2(t.x,t.z)+Math.PI);
@@ -7626,7 +7630,7 @@ export function construir(ruta, cum, coords, D, m0, m1, tramos){
   let prev = null;
   for(const q of D.lim){
     if(q.s0<m0||q.s0>m1){ prev=q.kmh; continue; }
-    if(q.kmh!==prev){ const i = muestraDe(q.s0); if(i>=0){ const {p,t}=S[i], l=left(t); const off=-(W[i]/2+4.4);
+    if(q.kmh!==prev){ const i = muestraDe(q.s0); if(i>=0){ const {p,t}=S[i], l=left(t); const off=-(W[i]/2+4.4)+sh[i];
       const m = meshSimple(new T.CircleGeometry(1.25,24),limiteTex(q.kmh)); const st = meshSimple(new T.CylinderGeometry(0.07,0.07,4,6),null,colores.poste);
       const g = new T.Group(); st.position.y=2; m.position.set(0,4.3,0.08); g.add(st); g.add(m);
       g.position.set(p.x+l.x*off,0,p.z+l.z*off); g.rotation.y=Math.atan2(t.x,t.z)+Math.PI; grupo.add(g); } }
@@ -7640,14 +7644,14 @@ export function construir(ruta, cum, coords, D, m0, m1, tramos){
     for(const s of [1,-1]){ const col=meshSimple(new T.BoxGeometry(0.4,8,0.4),null,colores.poste); col.position.set(s*Wg/2,4,0); g.add(col); }
     const beam = meshSimple(new T.BoxGeometry(Wg,0.5,0.5),null,colores.poste); beam.position.y=7.9; g.add(beam);
     const sg = meshSimple(new T.PlaneGeometry(Math.min(W[i]+3,13),3.8),cartelTex(c.rn,c.txt)); sg.position.set(0,5.7,0.3); sg.rotation.y=Math.PI; g.add(sg);
-    g.position.copy(p); g.rotation.y=Math.atan2(t.x,t.z); grupo.add(g);
+    g.position.set(p.x+left(t).x*sh[i],0,p.z+left(t).z*sh[i]); g.rotation.y=Math.atan2(t.x,t.z); alto.add(g);
   }
 
 
   /* señales laterales de salida: aviso a 1000 y 500 m + marcas de cuenta atrás 300/200/100 m (a la derecha, cara al conductor) */
   for(const c of D.cart){
     if(!enTramo(c.s)) continue;
-    const poner = (mm, geo, tex, alto)=>{ if(mm<m0||mm>m1) return; const i=muestraDe(mm); if(i<0) return; const {p,t}=S[i], l=left(t); const off=-(W[i]/2+4.6);
+    const poner = (mm, geo, tex, alto)=>{ if(mm<m0||mm>m1) return; const i=muestraDe(mm); if(i<0) return; const {p,t}=S[i], l=left(t); const off=-(W[i]/2+4.6)+sh[i];
       const g=new T.Group(); const st=meshSimple(new T.CylinderGeometry(0.07,0.07,alto,6),null,colores.poste); st.position.y=alto/2; g.add(st);
       const pl=meshSimple(geo,tex); pl.position.set(0,alto+0.2,0.08); g.add(pl);
       g.position.set(p.x+l.x*off,0,p.z+l.z*off); g.rotation.y=Math.atan2(t.x,t.z)+Math.PI; grupo.add(g); };
@@ -7655,7 +7659,7 @@ export function construir(ruta, cum, coords, D, m0, m1, tramos){
     for(const [d,n] of [[300,3],[200,2],[100,1]]) poner(c.s-d, new T.PlaneGeometry(1.6,3.2), contadorTex(n), 3.4);
   }
 
-  return { grupo, lat0:ctx.lat0, lon0:ctx.lon0, info:{ muestras:N, tri, m0, m1, nMax:maxN } };
+  return { grupo, alto, lat0:ctx.lat0, lon0:ctx.lon0, info:{ muestras:N, tri, m0, m1, nMax:maxN } };
 }
 
 /* ---------- 4. integración con el mapa (solo en el navegador) ---------- */
@@ -7673,13 +7677,15 @@ function integrar(){
     st.tramos = detectarTramos(ruta,routeCumDist); st.ocultar = fusionar(st.tramos,CFG.GAP_OCULTAR);
     st.D = datosRuta(ruta,routeCumDist); st.ultMetro=-1e9; if(actual){ vaciar(); }
   }
-  function vaciar(){ if(actual && scene){ scene.remove(actual.grupo); actual.grupo.traverse(o=>{ if(o.geometry) o.geometry.dispose(); }); } actual=null; }
+  let scene2=null;
+  function vaciar(){ if(actual){ if(scene) scene.remove(actual.grupo); if(scene2) scene2.remove(actual.alto); actual.grupo.traverse(o=>{ if(o.geometry) o.geometry.dispose(); }); actual.alto.traverse(o=>{ if(o.geometry) o.geometry.dispose(); }); } actual=null; }
 
-  const capa = {
-    id:'autopista-via', type:'custom', renderingMode:'3d',
+  /* dos capas: 'autopista-via' (debajo de la línea azul: asfalto, rayas, barreras, farolas) y 'autopista-alto' (encima de la línea azul: pórticos), para que la ruta no tape los carteles */
+  const mkCapa = (id, cual) => ({
+    id, type:'custom', renderingMode:'3d',
     onAdd(map_, gl){
-      renderer = new T.WebGLRenderer({ canvas:map_.getCanvas(), context:gl, antialias:true }); renderer.autoClear=false;
-      scene = new T.Scene(); camera = new T.Camera(); layerOk=true;
+      if(!renderer){ renderer = new T.WebGLRenderer({ canvas:map_.getCanvas(), context:gl, antialias:true }); renderer.autoClear=false; scene = new T.Scene(); scene2 = new T.Scene(); camera = new T.Camera(); }
+      if(cual===1) layerOk=true;
     },
     render(gl, matrix){
       if(!st.activo || !actual || !layerOk) return;
@@ -7690,11 +7696,28 @@ function integrar(){
         const o = maplibregl.MercatorCoordinate.fromLngLat([actual.lon0,actual.lat0],0), s = o.meterInMercatorCoordinateUnits();
         const l = new T.Matrix4().makeTranslation(o.x,o.y,o.z).scale(new T.Vector3(s,-s,s)).multiply(new T.Matrix4().makeRotationX(Math.PI/2));
         camera.projectionMatrix = proy.multiply(l);
-        renderer.resetState(); renderer.render(scene,camera); renderer.resetState();
+        renderer.resetState(); renderer.render(cual===1?scene:scene2,camera); renderer.resetState();
       }catch(e){ st.error=e.message; }
-      st.ms += (performance.now()-t0); st.frames++;
+      st.ms += (performance.now()-t0); if(cual===1) st.frames++;
     }
-  };
+  });
+  const capa = mkCapa('autopista-via',1), capaAlto = mkCapa('autopista-alto',2);
+
+  /* línea azul más ancha mientras dibuja el 3D (ancho = fracción de un carril a escala real) */
+  const ANCHO_ORIG = { 'ruta-halo':['interpolate',['linear'],['zoom'],14,18,16,26,18,34,20,44] };
+  const ANCHO_N = ['interpolate',['linear'],['zoom'],14,10,16,16,18,22,20,30];
+  const FRAC = { 'ruta-halo':0.95, 'ruta-base':0.75, 'ruta-1':0.75, 'ruta-2':0.75, 'ruta-3':0.75 };
+  function anchoRuta(activo){
+    try{
+      const lat = Math.round((lastFix?lastFix.lat:43)*2)/2, k = CFG.LANE/(78271.517*Math.cos(lat*Math.PI/180));
+      for(const id in FRAC){
+        if(!map.getLayer(id)) continue;
+        const want = activo ? ['interpolate',['exponential',2],['zoom'],14,FRAC[id]*k*16384,22,FRAC[id]*k*4194304] : (ANCHO_ORIG[id]||ANCHO_N);
+        if(JSON.stringify(map.getPaintProperty(id,'line-width'))!==JSON.stringify(want)) map.setPaintProperty(id,'line-width',want);
+      }
+      st.anchoOn = !!activo;
+    }catch(e){}
+  }
 
   function ocultarCapas(v){
     try{
@@ -7717,6 +7740,7 @@ function integrar(){
         const antes = map.getLayer('ruta-halo')?'ruta-halo':(map.getLayer('ruta-base')?'ruta-base':undefined);
         map.addLayer(capa, antes);
       }
+      if(layerOk && !map.getLayer('autopista-alto') && map.getLayer('ruta-3')){ const ls=map.getStyle().layers.map(l=>l.id), ix=ls.indexOf('ruta-3'); map.addLayer(capaAlto, ls[ix+1]); }
       const s = routeCoordsLL.length ? recorridoAhora([lastFix.lat,lastFix.lon]) : 0;
       const dentroOcultar = st.ocultar.some(t=>s>=t.s0-CFG.ANTICIPO && s<=t.s1+CFG.SALIDA);
       const dentroVia = st.tramos.some(t=>s>=t.s0-CFG.ANTICIPO && s<=t.s1+CFG.SALIDA);
@@ -7729,14 +7753,14 @@ function integrar(){
         const t0=performance.now();
         const m0 = Math.max(0,s-CFG.ATRAS), m1 = Math.min(routeCumDist[routeCumDist.length-1], s+CFG.ADELANTE);
         const r = construir(G.__rutaCruda,routeCumDist,routeCoordsLL,st.D,m0,m1,st.tramos);
-        vaciar(); if(r){ actual=r; scene.add(r.grupo); st.build=Object.assign({ms:Math.round(performance.now()-t0)},r.info); }
+        vaciar(); if(r){ actual=r; scene.add(r.grupo); scene2.add(r.alto); st.build=Object.assign({ms:Math.round(performance.now()-t0)},r.info); }
         st.ultMetro=s; map.triggerRepaint();
       }
     }catch(e){ st.error=e.message; log('tick: '+e.message); }
   }
   setInterval(tick,350);
   /* las capas ocultas se vigilan aparte (cada 120 ms): el módulo viejo de carriles las vuelve a mostrar al mover el mapa y parpadeaban */
-  setInterval(()=>{ try{ if(!st.activo && !ocultoAhora) return; for(const id of (st.idsOcultar||[])){ if(map.getLayer(id) && map.getLayoutProperty(id,'visibility')!=='none') map.setLayoutProperty(id,'visibility','none'); } }catch(e){} },120);
+  setInterval(()=>{ try{ if(st.activo||st.anchoOn) anchoRuta(!!st.activo); if(!st.activo && !ocultoAhora) return; for(const id of (st.idsOcultar||[])){ if(map.getLayer(id) && map.getLayoutProperty(id,'visibility')!=='none') map.setLayoutProperty(id,'visibility','none'); } }catch(e){} },120);
 
   /* botón en Ajustes */
   const b = document.getElementById('btnAutopista'), d = document.getElementById('autopistaDiag');
