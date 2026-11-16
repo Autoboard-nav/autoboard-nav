@@ -549,7 +549,7 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v235 · AUTOPISTA (más ancha, sin líneas viejas ni autopista amarilla del mapa)</div>
+  <div class="seccion">Versión v236 · AUTOPISTA (más zoom, carteles grandes, rayas fijas)</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -2639,7 +2639,7 @@ function bucleSeguimiento(ts){
   let zObj=zBase+mn.extra+CAM.ZOOM_AUTOPISTA_EXTRA*fAut+((window.__autopista&&window.__autopista.activo)?(window.__autopista.zoomExtra||0)*fAut:0);   /* modo autopista 3D: menos alejamiento (ajustable en Ajustes) */
   /* tope por velocidad: acercar el mapa multiplica la velocidad con que pasa por la pantalla (px/s = m/s × 2^zoom / (78271·cos(lat))). A 100 km/h el zoom 21,2
      de una maniobra daba ~1.200 px/s (parece que la cámara se dispara); se limita a CAM.PX_S_MAX px/s. En ciudad (≤ ~45 km/h) no cambia nada. */
-  const zTope=Math.log2(CAM.PX_S_MAX*78271.5*Math.cos(pred.lat*Math.PI/180)/Math.max(vSuave,4));
+  const zTope=Math.log2(((window.__autopista&&window.__autopista.activo)?900:CAM.PX_S_MAX)*78271.5*Math.cos(pred.lat*Math.PI/180)/Math.max(vSuave,4));
   if(zObj>zTope) zObj=Math.max(zBase+CAM.ZOOM_AUTOPISTA_EXTRA*fAut, zTope);
   fDenso+=(fDensoObj-fDenso)*camK(fDensoObj>fDenso?CAM_DENSO.TAU_SUBE:CAM_DENSO.TAU_BAJA,dt);
   const fDn=camDensoOn?fDenso*(1-fAut):0;   /* no en autopista/perspectiva */
@@ -7385,7 +7385,7 @@ const KILL = typeof location!=='undefined' && /[?&]ap=0\b/.test(location.search)
 const CFG = { LANE:4.6, ATRAS:100, ADELANTE:900, PASO:2, REBUILD_M:35, ANTICIPO:250, SALIDA:30, N_DEF:2, N_VUELTA:2, MEDIANA:4.6, MINZOOM:13.5, GAP_OCULTAR:1200 };
 const G = (typeof window!=='undefined') ? window : globalThis;
 let ON = true; try{ ON = localStorage.getItem('apModo')!=='0'; }catch(e){}
-const ZOOM_AP = [0, 0.6, 1.2, 1.8, 2.4, 3.0], ZOOM_AP_TXT = ['normal','+','++','+++','++++','+++++']; let ZI = 4; try{ const z=parseInt(localStorage.getItem('apZoom')); if(z>=0&&z<=5) ZI=z; }catch(e){}
+const ZOOM_AP = [0, 0.6, 1.2, 1.8, 2.4, 3.0, 3.6, 4.2], ZOOM_AP_TXT = ['normal','+','++','+++','++++','+++++','++++++','+++++++']; let ZI = 6; try{ const z=parseInt(localStorage.getItem('apZoom')); if(z>=0&&z<=7) ZI=z; }catch(e){}
 
 /* ---------- 1. detectar tramos de autopista en la ruta ---------- */
 const FIN_RE = /TAKE_EXIT|MOTORWAY_EXIT|TURN|ROUNDABOUT|ARRIVE|WAYPOINT|SHARP/;
@@ -7496,7 +7496,7 @@ export function muestrear(coords, cum, m0, m1){
   const curve = new T.CatmullRomCurve3(pts,false,'centripetal');
   const L = curve.getLength(); if(!(L>CFG.PASO*2)) return null;
   const n = Math.max(2,Math.round(L/CFG.PASO)), S = [];
-  for(let i=0;i<=n;i++){ const u=i/n; const p=curve.getPointAt(u), t=curve.getTangentAt(u); t.y=0; t.normalize(); S.push({p,t,m:cum[i0]+u*L}); }
+  for(let i=0;i<=n;i++){ const u=i/n; const p=curve.getPointAt(u), t=curve.getTangentAt(u); t.y=0; t.normalize(); S.push({p,t,m:cum[i0]+u*(cum[i1]-cum[i0])}); }
   return { S, ctx, i0, L };
 }
 
@@ -7511,6 +7511,7 @@ export function construir(ruta, cum, coords, D, m0, m1, tramos){
   const R = 18;   /* ±36 m de suavizado del ancho */
   for(let i=0;i<N;i++){ let a=0,c=0; for(let j=Math.max(0,i-R);j<=Math.min(N-1,i+R);j++){ a+=Wraw[j]; c++; } W[i]=a/c; }
   /* ¿esta muestra es calzada de autopista (no rampa)? → solo ahí hay calzada de vuelta */
+  const inicios=(a,b,tot)=>{ const P=tot*CFG.PASO, r=[]; for(let s=Math.max(a,1);s<=b;s++){ if(Math.floor(S[s].m/P)!==Math.floor(S[s-1].m/P)) r.push(s); } return r; };
   const enTramo = m => tramos.some(t=>m>=t.s0 && m<=t.s1);
 
   const grupo = new T.Group();
@@ -7552,7 +7553,7 @@ export function construir(ruta, cum, coords, D, m0, m1, tramos){
       const kind = /NO_|NONE/.test(tipo) ? null : (/SHORT/.test(tipo)?'SHORT':(/DASH/.test(tipo)?'LARGO':'SOLID'));
       if(kind){
         if(kind==='SOLID') tira('lin',ii=>off(ii)+0.15,ii=>off(ii)-0.15,Y.lin,i,j);
-        else { const on=kind==='SHORT'?1:2, tot=kind==='SHORT'?3:6; for(let s=i;s+on<=j;s+=tot) tira('lin',ii=>off(ii)+0.15,ii=>off(ii)-0.15,Y.lin,s,Math.min(j,s+on)); }
+        else { const on=kind==='SHORT'?1:2, tot=kind==='SHORT'?3:6; for(const s of inicios(i,j,tot)){ if(s+on>j) break; tira('lin',ii=>off(ii)+0.15,ii=>off(ii)-0.15,Y.lin,s,Math.min(j,s+on)); } }
       }
       i=j+1;
     }
@@ -7566,7 +7567,7 @@ export function construir(ruta, cum, coords, D, m0, m1, tramos){
         const o0 = ii => W[ii]/2+3.2+CFG.MEDIANA*0.5, o1 = ii => o0(ii)+WV;
         tira('ret', ii=>o0(ii)-1.2, ii=>o1(ii)+1.2, Y.asf-0.01, i, j);
         tira('linRet', ii=>o0(ii)+0.12, ii=>o0(ii)-0.12, Y.lin-0.01, i, j); tira('linRet', ii=>o1(ii)+0.12, ii=>o1(ii)-0.12, Y.lin-0.01, i, j);
-        for(let s=i;s+2<=j;s+=6) tira('linRet', ii=>o0(ii)+LANE+0.12, ii=>o0(ii)+LANE-0.12, Y.lin-0.01, s, Math.min(j,s+2));
+        for(const s of inicios(i,j,6)){ if(s+2>j) break; tira('linRet', ii=>o0(ii)+LANE+0.12, ii=>o0(ii)+LANE-0.12, Y.lin-0.01, s, Math.min(j,s+2)); }
       }
       i=j+1; } }
 
@@ -7626,8 +7627,8 @@ export function construir(ruta, cum, coords, D, m0, m1, tramos){
   for(const q of D.lim){
     if(q.s0<m0||q.s0>m1){ prev=q.kmh; continue; }
     if(q.kmh!==prev){ const i = muestraDe(q.s0); if(i>=0){ const {p,t}=S[i], l=left(t); const off=-(W[i]/2+4.4);
-      const m = meshSimple(new T.CircleGeometry(0.8,24),limiteTex(q.kmh)); const st = meshSimple(new T.CylinderGeometry(0.06,0.06,3,6),null,colores.poste);
-      const g = new T.Group(); st.position.y=1.5; m.position.set(0,3.3,0.08); g.add(st); g.add(m);
+      const m = meshSimple(new T.CircleGeometry(1.25,24),limiteTex(q.kmh)); const st = meshSimple(new T.CylinderGeometry(0.07,0.07,4,6),null,colores.poste);
+      const g = new T.Group(); st.position.y=2; m.position.set(0,4.3,0.08); g.add(st); g.add(m);
       g.position.set(p.x+l.x*off,0,p.z+l.z*off); g.rotation.y=Math.atan2(t.x,t.z)+Math.PI; grupo.add(g); } }
     prev = q.kmh;
   }
@@ -7636,9 +7637,9 @@ export function construir(ruta, cum, coords, D, m0, m1, tramos){
   for(const c of D.cart){
     const mm = c.s-350; if(mm<m0||mm>m1||!enTramo(c.s)) continue; const i = muestraDe(Math.max(mm,m0+20)); if(i<0) continue;
     const {p,t}=S[i], Wg=W[i]+7; const g = new T.Group();
-    for(const s of [1,-1]){ const col=meshSimple(new T.BoxGeometry(0.4,7,0.4),null,colores.poste); col.position.set(s*Wg/2,3.5,0); g.add(col); }
-    const beam = meshSimple(new T.BoxGeometry(Wg,0.5,0.5),null,colores.poste); beam.position.y=6.9; g.add(beam);
-    const sg = meshSimple(new T.PlaneGeometry(Math.min(W[i],9),2.4),cartelTex(c.rn,c.txt)); sg.position.set(0,5.4,0.3); sg.rotation.y=Math.PI; g.add(sg);
+    for(const s of [1,-1]){ const col=meshSimple(new T.BoxGeometry(0.4,8,0.4),null,colores.poste); col.position.set(s*Wg/2,4,0); g.add(col); }
+    const beam = meshSimple(new T.BoxGeometry(Wg,0.5,0.5),null,colores.poste); beam.position.y=7.9; g.add(beam);
+    const sg = meshSimple(new T.PlaneGeometry(Math.min(W[i]+3,13),3.8),cartelTex(c.rn,c.txt)); sg.position.set(0,5.7,0.3); sg.rotation.y=Math.PI; g.add(sg);
     g.position.copy(p); g.rotation.y=Math.atan2(t.x,t.z); grupo.add(g);
   }
 
@@ -7650,8 +7651,8 @@ export function construir(ruta, cum, coords, D, m0, m1, tramos){
       const g=new T.Group(); const st=meshSimple(new T.CylinderGeometry(0.07,0.07,alto,6),null,colores.poste); st.position.y=alto/2; g.add(st);
       const pl=meshSimple(geo,tex); pl.position.set(0,alto+0.2,0.08); g.add(pl);
       g.position.set(p.x+l.x*off,0,p.z+l.z*off); g.rotation.y=Math.atan2(t.x,t.z)+Math.PI; grupo.add(g); };
-    for(const [d,tx] of [[1000,'1 km'],[500,'500 m']]) poner(c.s-d, new T.PlaneGeometry(3.4,2.4), avisoTex(c.rn,c.txt,tx), 3.0);
-    for(const [d,n] of [[300,3],[200,2],[100,1]]) poner(c.s-d, new T.PlaneGeometry(1.1,2.2), contadorTex(n), 2.6);
+    for(const [d,tx] of [[1000,'1 km'],[500,'500 m']]) poner(c.s-d, new T.PlaneGeometry(5.4,3.8), avisoTex(c.rn,c.txt,tx), 4.2);
+    for(const [d,n] of [[300,3],[200,2],[100,1]]) poner(c.s-d, new T.PlaneGeometry(1.6,3.2), contadorTex(n), 3.4);
   }
 
   return { grupo, lat0:ctx.lat0, lon0:ctx.lon0, info:{ muestras:N, tri, m0, m1, nMax:maxN } };
@@ -7699,7 +7700,7 @@ function integrar(){
     try{
       const esViaAutopista = l => (l.type==='line' && /motorway/i.test(l.id+JSON.stringify(l.filter||''))) && !/^(ruta|carriles|autopista|glb)/.test(l.id);
       const ids = map.getStyle().layers.filter(l=>l.id!=='autopista-via' && (/building|^suave-(verde|arboles|sombras|acera)|^barrio|arbol|tree|^carriles-/i.test(l.id) || esViaAutopista(l))).map(l=>l.id);
-      st.nOcultas = ids.length;
+      st.nOcultas = ids.length; st.idsOcultar = ids;
       for(const id of ids){
         if(v){ if(!st.ocultas.has(id)){ st.ocultas.set(id,map.getLayoutProperty(id,'visibility')||'visible'); } if(map.getLayoutProperty(id,'visibility')!=='none') map.setLayoutProperty(id,'visibility','none'); }
       }
@@ -7734,12 +7735,14 @@ function integrar(){
     }catch(e){ st.error=e.message; log('tick: '+e.message); }
   }
   setInterval(tick,350);
+  /* las capas ocultas se vigilan aparte (cada 120 ms): el módulo viejo de carriles las vuelve a mostrar al mover el mapa y parpadeaban */
+  setInterval(()=>{ try{ if(!st.activo && !ocultoAhora) return; for(const id of (st.idsOcultar||[])){ if(map.getLayer(id) && map.getLayoutProperty(id,'visibility')!=='none') map.setLayoutProperty(id,'visibility','none'); } }catch(e){} },120);
 
   /* botón en Ajustes */
   const b = document.getElementById('btnAutopista'), d = document.getElementById('autopistaDiag');
   const bz = document.getElementById('btnApZoom');
   if(bz){ const pz=()=>{ bz.textContent='🔍 Zoom en autopista: '+ZOOM_AP_TXT[ZI]; st.zoomExtra=ZOOM_AP[ZI]; }; pz();
-    bz.onclick=()=>{ ZI=(ZI+1)%6; try{ localStorage.setItem('apZoom',String(ZI)); }catch(e){} pz(); }; }
+    bz.onclick=()=>{ ZI=(ZI+1)%8; try{ localStorage.setItem('apZoom',String(ZI)); }catch(e){} pz(); }; }
   if(b){
     const pinta = ()=>{ b.textContent = '🛣️ Modo autopista: '+(ON?'ACTIVADO':'DESACTIVADO'); };
     pinta();
