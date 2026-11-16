@@ -549,7 +549,7 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v234 (autopista)</div>
+  <div class="seccion">Versión v235 · AUTOPISTA (más ancha, sin líneas viejas ni autopista amarilla del mapa)</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -7382,7 +7382,7 @@ window.__CLIPS_VOZ.radar='SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAAAAAA
 import * as T from 'three';
 
 const KILL = typeof location!=='undefined' && /[?&]ap=0\b/.test(location.search);
-const CFG = { LANE:3.5, ATRAS:100, ADELANTE:620, PASO:2, REBUILD_M:35, ANTICIPO:250, SALIDA:30, N_DEF:2, N_VUELTA:2, MEDIANA:4.6, MINZOOM:13.5, GAP_OCULTAR:1200 };
+const CFG = { LANE:4.6, ATRAS:100, ADELANTE:900, PASO:2, REBUILD_M:35, ANTICIPO:250, SALIDA:30, N_DEF:2, N_VUELTA:2, MEDIANA:4.6, MINZOOM:13.5, GAP_OCULTAR:1200 };
 const G = (typeof window!=='undefined') ? window : globalThis;
 let ON = true; try{ ON = localStorage.getItem('apModo')!=='0'; }catch(e){}
 const ZOOM_AP = [0, 0.6, 1.2, 1.8, 2.4, 3.0], ZOOM_AP_TXT = ['normal','+','++','+++','++++','+++++']; let ZI = 4; try{ const z=parseInt(localStorage.getItem('apZoom')); if(z>=0&&z<=5) ZI=z; }catch(e){}
@@ -7697,7 +7697,9 @@ function integrar(){
 
   function ocultarCapas(v){
     try{
-      const ids = map.getStyle().layers.map(l=>l.id).filter(id=>/building|^suave-(verde|arboles|sombras|acera)|^barrio|arbol|tree/i.test(id) && id!=='autopista-via');
+      const esViaAutopista = l => (l.type==='line' && /motorway/i.test(l.id+JSON.stringify(l.filter||''))) && !/^(ruta|carriles|autopista|glb)/.test(l.id);
+      const ids = map.getStyle().layers.filter(l=>l.id!=='autopista-via' && (/building|^suave-(verde|arboles|sombras|acera)|^barrio|arbol|tree|^carriles-/i.test(l.id) || esViaAutopista(l))).map(l=>l.id);
+      st.nOcultas = ids.length;
       for(const id of ids){
         if(v){ if(!st.ocultas.has(id)){ st.ocultas.set(id,map.getLayoutProperty(id,'visibility')||'visible'); } if(map.getLayoutProperty(id,'visibility')!=='none') map.setLayoutProperty(id,'visibility','none'); }
       }
@@ -7744,7 +7746,7 @@ function integrar(){
     b.onclick = ()=>{ ON=!ON; try{ localStorage.setItem('apModo',ON?'1':'0'); }catch(e){} pinta(); tick(); };
     if(d) setInterval(()=>{
       const x=G.__autopista; if(!x) return;
-      d.textContent = (x.activo?'DIBUJANDO':'inactivo')+' · tramos '+x.tramos.length+(x.build?(' · '+x.build.muestras+' muestras, '+x.build.tri+' tri, build '+x.build.ms+' ms'):'')+(x.frames?(' · dibujo '+(x.ms/x.frames).toFixed(2)+' ms/frame'):'')+(x.error?(' · ERROR '+x.error):'');
+      d.textContent = (x.activo?'DIBUJANDO':'inactivo')+' · capas ocultas '+(x.nOcultas||0)+' · tramos '+x.tramos.length+(x.build?(' · '+x.build.muestras+' muestras, '+x.build.tri+' tri, build '+x.build.ms+' ms'):'')+(x.frames?(' · dibujo '+(x.ms/x.frames).toFixed(2)+' ms/frame'):'')+(x.error?(' · ERROR '+x.error):'');
     },1000);
   }
 }
