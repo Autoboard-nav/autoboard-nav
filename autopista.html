@@ -542,13 +542,14 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
   <button class="ajuste" id="btnGuardarRuta" style="background:#27384a">💾 Guardar ruta para pruebas (autopista)</button>
   <div id="guardarRutaDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste" id="btnAutopista" style="background:#27384a">🛣️ Modo autopista</button>
+  <button class="ajuste" id="btnApZoom" style="background:#27384a">🔍 Zoom en autopista</button>
   <div id="autopistaDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste" id="btnBanco" style="background:#27384a">🧪 Banco de pruebas de capas (~3 min, simulación)</button>
   <div id="bancoDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v233</div>
+  <div class="seccion">Versión v234 (autopista)</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -2635,7 +2636,7 @@ function bucleSeguimiento(ts){
   const fVel=camSmooth(camClamp((vZoom*3.6-CAM.AUT_V_MIN_KMH)/(CAM.AUT_V_MAX_KMH-CAM.AUT_V_MIN_KMH),0,1));
   const fDis=camSmooth(camClamp((dNext-CAM.AUT_D_MIN_M)/(CAM.AUT_D_MAX_M-CAM.AUT_D_MIN_M),0,1));
   const fAut=fVel*fDis*(1-mn.peso);
-  let zObj=zBase+mn.extra+CAM.ZOOM_AUTOPISTA_EXTRA*fAut;
+  let zObj=zBase+mn.extra+CAM.ZOOM_AUTOPISTA_EXTRA*fAut+((window.__autopista&&window.__autopista.activo)?(window.__autopista.zoomExtra||0)*fAut:0);   /* modo autopista 3D: menos alejamiento (ajustable en Ajustes) */
   /* tope por velocidad: acercar el mapa multiplica la velocidad con que pasa por la pantalla (px/s = m/s × 2^zoom / (78271·cos(lat))). A 100 km/h el zoom 21,2
      de una maniobra daba ~1.200 px/s (parece que la cámara se dispara); se limita a CAM.PX_S_MAX px/s. En ciudad (≤ ~45 km/h) no cambia nada. */
   const zTope=Math.log2(CAM.PX_S_MAX*78271.5*Math.cos(pred.lat*Math.PI/180)/Math.max(vSuave,4));
@@ -5884,7 +5885,7 @@ window.__carg=(function(){
   document.head.appendChild(st);
 
   const CATS=[['mapa','🗺️ Mapa y vista'],['aspecto','🎨 Aspecto del mapa'],['cielo','🌦️ Cielo y tiempo'],['sonido','🔊 Sonido y avisos'],['carg','⚡ Cargadores'],['park','🅿️ Aparcamientos'],['gps','📍 GPS'],['coche','🚗 Coche'],['futbol','⚽ Fútbol'],['fiesta','🎉 Celebración'],['enlace','🔗 Enlace entre dispositivos'],['inc','⚠️ Incidencias'],['sis','⚙️ Rendimiento y versión']];
-  const M={mapa:'btnEdificios btnHitos btnSenales btnPitch btnTrafico btnTraficoCalles btnModoMapa btnLuces btnCarriles btnAutoAncho btnAutoVista btnPasos btnPeajes btnTramos btnSugerido btnFlechaMan btnEstSol btnEstLuz btnEstVias btnEstRelieve btnBusqAmbito btnCamDenso btnFlechas btnPantCompleta',aspecto:'btnRelAgua btnRelVerde btnRelPuente btnAspBarrio btnAspVerde btnAspArboles btnAspAceras btnAspBorde btnAspMedir aspDiag btnAspEstacion',cielo:'btnSky btnCielo btnTiempo',sonido:'btnAvisosRadares btnObras btnVoz btnVozVol',carg:'btnListaCargadores btnCargMapa btnCargAm btnCargAz btnCargVe cargDiag btnCargTe',park:'btnParkOn btnParkGra btnParkSub btnListaParking parkDiag',gps:'btnGpsMan btnGpsAuto',coche:'btnCoche filaColorCoche btnTiltCoche',futbol:'btnListaCampos',fiesta:'btnCelebracion',enlace:'enlaceCodigo enlaceGenerar enlaceCopiar enlaceEstado',inc:'incList btnIncLimpiar btnGuardarRuta guardarRutaDiag btnAutopista autopistaDiag btnBanco bancoDiag btnFluidez fluDiag',sis:'btnAA btnTestTramo tramoDiag evFila btnEVPlan evPlanTxt btnTestEV evDiag btnLimpiarFavs btnWake'};
+  const M={mapa:'btnEdificios btnHitos btnSenales btnPitch btnTrafico btnTraficoCalles btnModoMapa btnLuces btnCarriles btnAutoAncho btnAutoVista btnPasos btnPeajes btnTramos btnSugerido btnFlechaMan btnEstSol btnEstLuz btnEstVias btnEstRelieve btnBusqAmbito btnCamDenso btnFlechas btnPantCompleta',aspecto:'btnRelAgua btnRelVerde btnRelPuente btnAspBarrio btnAspVerde btnAspArboles btnAspAceras btnAspBorde btnAspMedir aspDiag btnAspEstacion',cielo:'btnSky btnCielo btnTiempo',sonido:'btnAvisosRadares btnObras btnVoz btnVozVol',carg:'btnListaCargadores btnCargMapa btnCargAm btnCargAz btnCargVe cargDiag btnCargTe',park:'btnParkOn btnParkGra btnParkSub btnListaParking parkDiag',gps:'btnGpsMan btnGpsAuto',coche:'btnCoche filaColorCoche btnTiltCoche',futbol:'btnListaCampos',fiesta:'btnCelebracion',enlace:'enlaceCodigo enlaceGenerar enlaceCopiar enlaceEstado',inc:'incList btnIncLimpiar btnGuardarRuta guardarRutaDiag btnAutopista btnApZoom autopistaDiag btnBanco bancoDiag btnFluidez fluDiag',sis:'btnAA btnTestTramo tramoDiag evFila btnEVPlan evPlanTxt btnTestEV evDiag btnLimpiarFavs btnWake'};
   const POR={}; for(const c in M) M[c].split(' ').forEach(id=>POR[id]=c);
   const cuerpos={}, cats={};
   const ref=panel.querySelector('h2');
@@ -7384,6 +7385,7 @@ const KILL = typeof location!=='undefined' && /[?&]ap=0\b/.test(location.search)
 const CFG = { LANE:3.5, ATRAS:100, ADELANTE:620, PASO:2, REBUILD_M:35, ANTICIPO:250, SALIDA:30, N_DEF:2, N_VUELTA:2, MEDIANA:4.6, MINZOOM:13.5, GAP_OCULTAR:1200 };
 const G = (typeof window!=='undefined') ? window : globalThis;
 let ON = true; try{ ON = localStorage.getItem('apModo')!=='0'; }catch(e){}
+const ZOOM_AP = [0, 0.6, 1.2, 1.8], ZOOM_AP_TXT = ['normal','+','++','+++']; let ZI = 2; try{ const z=parseInt(localStorage.getItem('apZoom')); if(z>=0&&z<=3) ZI=z; }catch(e){}
 
 /* ---------- 1. detectar tramos de autopista en la ruta ---------- */
 const FIN_RE = /TAKE_EXIT|MOTORWAY_EXIT|TURN|ROUNDABOUT|ARRIVE|WAYPOINT|SHARP/;
@@ -7629,7 +7631,7 @@ export function construir(ruta, cum, coords, D, m0, m1, tramos){
 /* ---------- 4. integración con el mapa (solo en el navegador) ---------- */
 function integrar(){
   if(KILL) return;
-  const st = { activo:false, ocultas:new Map(), tramos:[], ocultar:[], D:null, rutaRef:null, ultMetro:-1e9, build:null, ms:0, frames:0, error:'' };
+  const st = { zoomExtra:ZOOM_AP[ZI], activo:false, ocultas:new Map(), tramos:[], ocultar:[], D:null, rutaRef:null, ultMetro:-1e9, build:null, ms:0, frames:0, error:'' };
   G.__autopista = st;
   const log = (m)=>{ try{ registrarError('autopista',m); }catch(e){} };
   let renderer=null, scene=null, camera=null, layerOk=false, actual=null, buildKey='';
@@ -7704,6 +7706,9 @@ function integrar(){
 
   /* botón en Ajustes */
   const b = document.getElementById('btnAutopista'), d = document.getElementById('autopistaDiag');
+  const bz = document.getElementById('btnApZoom');
+  if(bz){ const pz=()=>{ bz.textContent='🔍 Zoom en autopista: '+ZOOM_AP_TXT[ZI]; st.zoomExtra=ZOOM_AP[ZI]; }; pz();
+    bz.onclick=()=>{ ZI=(ZI+1)%4; try{ localStorage.setItem('apZoom',String(ZI)); }catch(e){} pz(); }; }
   if(b){
     const pinta = ()=>{ b.textContent = '🛣️ Modo autopista: '+(ON?'ACTIVADO':'DESACTIVADO'); };
     pinta();
