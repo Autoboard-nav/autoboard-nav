@@ -543,13 +543,14 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
   <div id="guardarRutaDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste" id="btnAutopista" style="background:#27384a">🛣️ Modo autopista</button>
   <button class="ajuste" id="btnApZoom" style="background:#27384a">🔍 Zoom en autopista</button>
+  <button class="ajuste" id="btnPrecarga" style="background:#27384a">📡 Precarga de teselas</button>
   <div id="autopistaDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste" id="btnBanco" style="background:#27384a">🧪 Banco de pruebas de capas (~3 min, simulación)</button>
   <div id="bancoDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v238 · AUTOPISTA (carriles: activo sin invertir)</div>
+  <div class="seccion">Versión v240 · AUTOPISTA (precarga de teselas)</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -5885,7 +5886,7 @@ window.__carg=(function(){
   document.head.appendChild(st);
 
   const CATS=[['mapa','🗺️ Mapa y vista'],['aspecto','🎨 Aspecto del mapa'],['cielo','🌦️ Cielo y tiempo'],['sonido','🔊 Sonido y avisos'],['carg','⚡ Cargadores'],['park','🅿️ Aparcamientos'],['gps','📍 GPS'],['coche','🚗 Coche'],['futbol','⚽ Fútbol'],['fiesta','🎉 Celebración'],['enlace','🔗 Enlace entre dispositivos'],['inc','⚠️ Incidencias'],['sis','⚙️ Rendimiento y versión']];
-  const M={mapa:'btnEdificios btnHitos btnSenales btnPitch btnTrafico btnTraficoCalles btnModoMapa btnLuces btnCarriles btnAutoAncho btnAutoVista btnPasos btnPeajes btnTramos btnSugerido btnFlechaMan btnEstSol btnEstLuz btnEstVias btnEstRelieve btnBusqAmbito btnCamDenso btnFlechas btnPantCompleta',aspecto:'btnRelAgua btnRelVerde btnRelPuente btnAspBarrio btnAspVerde btnAspArboles btnAspAceras btnAspBorde btnAspMedir aspDiag btnAspEstacion',cielo:'btnSky btnCielo btnTiempo',sonido:'btnAvisosRadares btnObras btnVoz btnVozVol',carg:'btnListaCargadores btnCargMapa btnCargAm btnCargAz btnCargVe cargDiag btnCargTe',park:'btnParkOn btnParkGra btnParkSub btnListaParking parkDiag',gps:'btnGpsMan btnGpsAuto',coche:'btnCoche filaColorCoche btnTiltCoche',futbol:'btnListaCampos',fiesta:'btnCelebracion',enlace:'enlaceCodigo enlaceGenerar enlaceCopiar enlaceEstado',inc:'incList btnIncLimpiar btnGuardarRuta guardarRutaDiag btnAutopista btnApZoom autopistaDiag btnBanco bancoDiag btnFluidez fluDiag',sis:'btnAA btnTestTramo tramoDiag evFila btnEVPlan evPlanTxt btnTestEV evDiag btnLimpiarFavs btnWake'};
+  const M={mapa:'btnEdificios btnHitos btnSenales btnPitch btnTrafico btnTraficoCalles btnModoMapa btnLuces btnCarriles btnAutoAncho btnAutoVista btnPasos btnPeajes btnTramos btnSugerido btnFlechaMan btnEstSol btnEstLuz btnEstVias btnEstRelieve btnBusqAmbito btnCamDenso btnFlechas btnPantCompleta',aspecto:'btnRelAgua btnRelVerde btnRelPuente btnAspBarrio btnAspVerde btnAspArboles btnAspAceras btnAspBorde btnAspMedir aspDiag btnAspEstacion',cielo:'btnSky btnCielo btnTiempo',sonido:'btnAvisosRadares btnObras btnVoz btnVozVol',carg:'btnListaCargadores btnCargMapa btnCargAm btnCargAz btnCargVe cargDiag btnCargTe',park:'btnParkOn btnParkGra btnParkSub btnListaParking parkDiag',gps:'btnGpsMan btnGpsAuto',coche:'btnCoche filaColorCoche btnTiltCoche',futbol:'btnListaCampos',fiesta:'btnCelebracion',enlace:'enlaceCodigo enlaceGenerar enlaceCopiar enlaceEstado',inc:'incList btnIncLimpiar btnGuardarRuta guardarRutaDiag btnAutopista btnApZoom btnPrecarga autopistaDiag btnBanco bancoDiag btnFluidez fluDiag',sis:'btnAA btnTestTramo tramoDiag evFila btnEVPlan evPlanTxt btnTestEV evDiag btnLimpiarFavs btnWake'};
   const POR={}; for(const c in M) M[c].split(' ').forEach(id=>POR[id]=c);
   const cuerpos={}, cats={};
   const ref=panel.querySelector('h2');
@@ -7384,6 +7385,7 @@ import * as T from 'three';
 const KILL = typeof location!=='undefined' && /[?&]ap=0\b/.test(location.search);
 const CFG = { LANE:4.6, ATRAS:100, ADELANTE:900, PASO:2, REBUILD_M:35, ANTICIPO:250, SALIDA:30, N_DEF:2, N_VUELTA:2, MEDIANA:4.6, MINZOOM:13.5, GAP_OCULTAR:1200 };
 const G = (typeof window!=='undefined') ? window : globalThis;
+let PRE = true; try{ PRE = localStorage.getItem('apPrecarga')!=='0'; }catch(e){}
 let ON = true; try{ ON = localStorage.getItem('apModo')!=='0'; }catch(e){}
 const ZOOM_AP = [0, 0.6, 1.2, 1.8, 2.4, 3.0, 3.6, 4.2], ZOOM_AP_TXT = ['normal','+','++','+++','++++','+++++','++++++','+++++++']; let ZI = 6; try{ const z=parseInt(localStorage.getItem('apZoom')); if(z>=0&&z<=7) ZI=z; }catch(e){}
 
@@ -7520,12 +7522,12 @@ export function construir(ruta, cum, coords, D, m0, m1, tramos){
 
   const grupo = new T.Group(), alto = new T.Group();
   const colores = {
-    asf:0x4a4e55, ars:0x6b6f6a, lin:0xf4f4ee, ret:0x5a5e66, linRet:0xd5d5cf, rail:0xaab0b8, poste:0x6a717c, lamp:0xdddddd
+    tal:0x6d9a55, copa:0x3f7a3f, tronco:0x6b4a2f, hito:0xf2f2ee, asf:0x4a4e55, ars:0x6b6f6a, lin:0xf4f4ee, ret:0x5a5e66, linRet:0xd5d5cf, rail:0xaab0b8, poste:0x6a717c, lamp:0xdddddd
   };
   const nocheOn = (typeof nocheAct!=='undefined') && !!nocheAct;
-  if(nocheOn){ colores.asf=0x2a2d33; colores.ars=0x3a3d42; colores.lin=0xcfcfc8; colores.ret=0x1d2026; colores.linRet=0x8a8a86; colores.rail=0x7a8088; colores.lamp=0xfff0c0; }
+  if(nocheOn){ colores.asf=0x2a2d33; colores.ars=0x3a3d42; colores.lin=0xcfcfc8; colores.ret=0x1d2026; colores.linRet=0x8a8a86; colores.rail=0x7a8088; colores.lamp=0xfff0c0; colores.tal=0x2c4a2e; colores.copa=0x1d3a22; colores.tronco=0x2a2018; colores.hito=0x9a9a96; }
 
-  const Y = { ars:0.20, asf:0.24, lin:0.30, flecha:0.33 };
+  const Y = { tal:0.10, ars:0.20, asf:0.24, lin:0.30, flecha:0.33 };
   /* acumuladores de geometría por material */
   const acc = {}; const A = k => acc[k] || (acc[k]={pos:[],idx:[]});
   function tira(k, offA, offB, y, i0=0, i1=N-1){   /* offA/offB: (i)=>desplazamiento lateral (+ = izquierda) */
@@ -7562,6 +7564,9 @@ export function construir(ruta, cum, coords, D, m0, m1, tramos){
       i=j+1;
     }
   }
+  /* taludes verdes planos (césped) a los lados: baratos, rellenan el vacío del mapa */
+  tira('tal', i=>-W[i]/2-3.6, i=>-W[i]/2-16, Y.tal);
+  { let i=0; while(i<N){ if(enTramo(S[i].m)){ i++; continue; } let j=i; while(j+1<N && !enTramo(S[j+1].m)) j++; if(j-i>=1) tira('tal', ii=>W[ii]/2+3.6, ii=>W[ii]/2+16, Y.tal, i, j); i=j+1; } }
   /* calzada de vuelta (solo en tramo de autopista): a la izquierda, tras la mediana */
   const NV = CFG.N_VUELTA, WV = NV*LANE;
   const vuelta = i => enTramo(S[i].m);
@@ -7580,6 +7585,7 @@ export function construir(ruta, cum, coords, D, m0, m1, tramos){
     ars:new T.MeshBasicMaterial({color:colores.ars,side:T.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}),
     lin:new T.MeshBasicMaterial({color:colores.lin,side:T.DoubleSide,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4}),
     ret:new T.MeshBasicMaterial({color:colores.ret,side:T.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}),
+    tal:new T.MeshBasicMaterial({color:colores.tal,side:T.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1}),
     linRet:new T.MeshBasicMaterial({color:colores.linRet,side:T.DoubleSide,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4})
   };
   let tri = 0;
@@ -7611,6 +7617,26 @@ export function construir(ruta, cum, coords, D, m0, m1, tramos){
       m4.compose(new T.Vector3(p.x+l.x*off,4.5,p.z+l.z*off),q,sc); postes.setMatrixAt(k,m4);
       m4.compose(new T.Vector3(p.x+l.x*off,9,p.z+l.z*off),q,sc); heads.setMatrixAt(k,m4); k++; } } }
   grupo.add(postes); grupo.add(heads);
+
+  /* árboles de copa cónica (instanciados, posiciones por hash del metro absoluto: no saltan al recalcular) y hitos kilométricos */
+  { const hash = k => { const x=Math.sin(k*12.9898)*43758.5453; return x-Math.floor(x); };
+    const pos=[]; for(let i=3;i<N;i+=7){ const k=Math.floor(S[i].m/14), h=hash(k), h2=hash(k+99); if(h<0.3) continue;
+      const lado = h2<0.5 ? -1 : 1; const vu = enTramo(S[i].m);
+      const off = lado<0 ? -(W[i]/2+8+h*12) : (vu ? W[i]/2+3.2+CFG.MEDIANA*0.5+NV*LANE+8+h*12 : W[i]/2+8+h*12);
+      pos.push([i,off+sh[i],0.8+h*0.8]); }
+    const cop=new T.InstancedMesh(new T.ConeGeometry(2.2,6.5,6),new T.MeshBasicMaterial({color:colores.copa}),pos.length||1);
+    const tro=new T.InstancedMesh(new T.CylinderGeometry(0.28,0.34,1.8,5),new T.MeshBasicMaterial({color:colores.tronco}),pos.length||1);
+    cop.frustumCulled=tro.frustumCulled=false; cop.count=tro.count=pos.length;
+    const m4=new T.Matrix4(), q=new T.Quaternion(), sc=new T.Vector3();
+    pos.forEach(([i,off,s],k)=>{ const {p,t}=S[i], l=left(t); sc.set(s,s,s);
+      m4.compose(new T.Vector3(p.x+l.x*off,0.9*s+3.25*s,p.z+l.z*off),q,sc); cop.setMatrixAt(k,m4);
+      m4.compose(new T.Vector3(p.x+l.x*off,0.9*s,p.z+l.z*off),q,sc); tro.setMatrixAt(k,m4); });
+    grupo.add(cop); grupo.add(tro);
+    const hit=[]; for(let i=1;i<N;i++){ if(Math.floor(S[i].m/100)!==Math.floor(S[i-1].m/100)) hit.push(i); }
+    const hm=new T.InstancedMesh(new T.BoxGeometry(0.35,1.1,0.18),new T.MeshBasicMaterial({color:colores.hito}),hit.length||1); hm.frustumCulled=false; hm.count=hit.length;
+    const e=new T.Euler(), qq=new T.Quaternion(), one=new T.Vector3(1,1,1);
+    hit.forEach((i,k)=>{ const {p,t}=S[i], l=left(t), off=-(W[i]/2+3.9)+sh[i]; e.set(0,Math.atan2(t.x,t.z),0); qq.setFromEuler(e); m4.compose(new T.Vector3(p.x+l.x*off,0.65,p.z+l.z*off),qq,one); hm.setMatrixAt(k,m4); });
+    grupo.add(hm); }
 
   const meshSimple = (geom, tex, color) => { const mt = new T.MeshBasicMaterial(tex?{map:tex,side:T.DoubleSide,transparent:true}:{color,side:T.DoubleSide}); const m=new T.Mesh(geom,mt); m.frustumCulled=false; return m; };
   const muestraDe = m => { let b=0,bd=1e9; for(let i=0;i<N;i++){ const d=Math.abs(S[i].m-m); if(d<bd){bd=d;b=i;} } return bd<20?b:-1; };
@@ -7732,6 +7758,36 @@ function integrar(){
   }
 
   let ocultoAhora=false, viaAhora=false, ultOcultar=0;
+
+  /* ---------- precarga de teselas por delante en la ruta (menos huecos de edificios/árboles; no dibuja nada) ---------- */
+  st.pre = { ok:0, err:0, cola:0, vistas:0 };
+  const vistas = new Set(), cola = []; let enVuelo = 0, ultPre = 0;
+  const tileDe = (lat,lon,z)=>{ const n=Math.pow(2,z), x=Math.floor((lon+180)/360*n), r=lat*Math.PI/180, y=Math.floor((1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*n); return [x,y]; };
+  function plantillas(){
+    const out=[]; try{ const src=map.getStyle().sources; for(const id in src){ if(src[id].type!=='vector') continue; const so=map.getSource(id); const t=so && (so.tiles||(so._options&&so._options.tiles)); if(t&&t.length) out.push({id,t:t[0],maxz:Math.min(14,so.maxzoom||14)}); } }catch(e){}
+    return out;
+  }
+  function bombear(){
+    while(enVuelo<2 && cola.length){ const u=cola.shift(); enVuelo++; st.pre.cola=cola.length;
+      fetch(u,{mode:'cors',credentials:'omit'}).then(r=>{ if(r.ok) st.pre.ok++; else st.pre.err++; return r.arrayBuffer(); }).catch(()=>{ st.pre.err++; }).finally(()=>{ enVuelo--; bombear(); }); }
+  }
+  function precargar(s){
+    if(!PRE || !routeCoordsLL.length || performance.now()-ultPre<4000 || st.pre.vistas>=300) return; ultPre=performance.now();
+    const tpl=plantillas(); if(!tpl.length) return;
+    const tot=routeCumDist[routeCumDist.length-1]; const m0=s, m1=Math.min(tot,s+3000);
+    let i=0; while(i<routeCumDist.length-1 && routeCumDist[i]<m0) i++;
+    let ult=-1e9;
+    for(;i<routeCoordsLL.length && routeCumDist[i]<=m1;i++){
+      if(routeCumDist[i]-ult<250) continue; ult=routeCumDist[i];
+      const la=routeCoordsLL[i][0], lo=routeCoordsLL[i][1], dla=700/110540, dlo=700/(111320*Math.cos(la*Math.PI/180));
+      for(const [a,b] of [[0,0],[dla,0],[-dla,0],[0,dlo],[0,-dlo]]){
+        for(const q of tpl){ const [x,y]=tileDe(la+a,lo+b,q.maxz), k=q.id+'/'+q.maxz+'/'+x+'/'+y; if(vistas.has(k)) continue; vistas.add(k); st.pre.vistas++;
+          cola.push(q.t.replace('{z}',q.maxz).replace('{x}',x).replace('{y}',y)); }
+      }
+    }
+    st.pre.cola=cola.length; bombear();
+  }
+
   function tick(){
     try{
       if(!ON || typeof map==='undefined' || !map.getStyle || !lastFix){ if(st.activo){ st.activo=false; ocultarCapas(false); vaciar(); } return; }
@@ -7742,6 +7798,7 @@ function integrar(){
       }
       if(layerOk && !map.getLayer('autopista-alto') && map.getLayer('ruta-3')){ const ls=map.getStyle().layers.map(l=>l.id), ix=ls.indexOf('ruta-3'); map.addLayer(capaAlto, ls[ix+1]); }
       const s = routeCoordsLL.length ? recorridoAhora([lastFix.lat,lastFix.lon]) : 0;
+      try{ precargar(s); }catch(e){}
       const dentroOcultar = st.ocultar.some(t=>s>=t.s0-CFG.ANTICIPO && s<=t.s1+CFG.SALIDA);
       const dentroVia = st.tramos.some(t=>s>=t.s0-CFG.ANTICIPO && s<=t.s1+CFG.SALIDA);
       const act = dentroOcultar && map.getZoom()>=CFG.MINZOOM;
@@ -7764,6 +7821,9 @@ function integrar(){
 
   /* botón en Ajustes */
   const b = document.getElementById('btnAutopista'), d = document.getElementById('autopistaDiag');
+  const bp = document.getElementById('btnPrecarga');
+  if(bp){ const pp=()=>{ bp.textContent='📡 Precarga de teselas: '+(PRE?'ACTIVADA':'DESACTIVADA'); }; pp();
+    bp.onclick=()=>{ PRE=!PRE; try{ localStorage.setItem('apPrecarga',PRE?'1':'0'); }catch(e){} pp(); }; }
   const bz = document.getElementById('btnApZoom');
   if(bz){ const pz=()=>{ bz.textContent='🔍 Zoom en autopista: '+ZOOM_AP_TXT[ZI]; st.zoomExtra=ZOOM_AP[ZI]; }; pz();
     bz.onclick=()=>{ ZI=(ZI+1)%8; try{ localStorage.setItem('apZoom',String(ZI)); }catch(e){} pz(); }; }
@@ -7773,7 +7833,7 @@ function integrar(){
     b.onclick = ()=>{ ON=!ON; try{ localStorage.setItem('apModo',ON?'1':'0'); }catch(e){} pinta(); tick(); };
     if(d) setInterval(()=>{
       const x=G.__autopista; if(!x) return;
-      d.textContent = (x.activo?'DIBUJANDO':'inactivo')+' · capas ocultas '+(x.nOcultas||0)+' · tramos '+x.tramos.length+(x.build?(' · '+x.build.muestras+' muestras, '+x.build.tri+' tri, build '+x.build.ms+' ms'):'')+(x.frames?(' · dibujo '+(x.ms/x.frames).toFixed(2)+' ms/frame'):'')+(x.error?(' · ERROR '+x.error):'');
+      d.textContent = (x.activo?'DIBUJANDO':'inactivo')+' · capas ocultas '+(x.nOcultas||0)+' · tramos '+x.tramos.length+(x.build?(' · '+x.build.muestras+' muestras, '+x.build.tri+' tri, build '+x.build.ms+' ms'):'')+(x.frames?(' · dibujo '+(x.ms/x.frames).toFixed(2)+' ms/frame'):'')+(x.pre?(' · precarga '+x.pre.ok+' ok/'+x.pre.err+' err/'+x.pre.cola+' en cola'):'')+(x.error?(' · ERROR '+x.error):'');
     },1000);
   }
 }
