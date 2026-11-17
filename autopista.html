@@ -551,7 +551,7 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v242 · AUTOPISTA (ruta azul suavizada)</div>
+  <div class="seccion">Versión v243 · AUTOPISTA (flecha redondeada y botones ⚡🅿️)</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -6727,7 +6727,8 @@ window.__flechaMan=(function(){
   }
   function flecha(s0,s1){
     const D=dims(), HW=D.HW, HW_CAB=D.HWC, CABEZA=D.CAB;
-    const A0=trozo(s0,s1-CABEZA), tip0=puntoEn(s1); if(A0.length<2||!tip0) return null;
+    let A0=trozo(s0,s1-CABEZA); const tip0=puntoEn(s1); if(A0.length<2||!tip0) return null;
+    if(window.__rutaSuave!==false){ try{ const sm=suavizarLinea(A0.map(p=>[p[1],p[0]]),2).map(q=>[q[1],q[0]]); if(sm.length>=2) A0=sm; }catch(e){} }   /* v243: la flecha sigue la misma curva suavizada que la línea azul (antes hacía ángulos rectos) */
     const la0=A0[0][0], lo0=A0[0][1], kx=111320*Math.cos(la0*Math.PI/180);
     const M=p=>[(p[1]-lo0)*kx,(p[0]-la0)*KY], U=m=>[la0+m[1]/KY, lo0+m[0]/kx];
     const P=A0.map(M), tip=M(tip0), n=P.length, nor=[], dirs=[];
@@ -7409,6 +7410,25 @@ function suavizarLinea(coords, pasadas){
 (function(){ let on=true; try{ on=localStorage.getItem("rutaSuave")!=="0"; }catch(e){} window.__rutaSuave=on;
   const b=document.getElementById("btnSuave"); if(!b) return; const t=()=>{ b.textContent="〰️ Ruta azul suavizada: "+(window.__rutaSuave?"ON":"OFF"); }; t();
   b.onclick=()=>{ window.__rutaSuave=!window.__rutaSuave; try{ localStorage.setItem("rutaSuave",window.__rutaSuave?"1":"0"); }catch(e){} t(); try{ actualizarTrimRuta(); }catch(e){} }; })();
+</script>
+<style>
+#apBotones{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:21;display:none;flex-direction:column;gap:12px}
+body.ap-3d #apBotones{display:flex}
+#apBotones button{width:76px;height:76px;border-radius:20px;border:2px solid rgba(255,255,255,.35);background:rgba(27,37,48,.9);color:#fff;font:700 12px system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;box-shadow:0 6px 18px rgba(0,0,0,.35);padding:0}
+#apBotones button .i{font-size:30px;line-height:1}
+#apBotones button.on{background:#1f8f4e;border-color:#fff}
+</style>
+<div id="apBotones"><button id="apBtnCarg"><span class="i">⚡</span>Cargadores</button><button id="apBtnPark"><span class="i">🅿️</span>Parking</button></div>
+<script>
+(function(){
+  const par=[['apBtnCarg','btnCargMapa'],['apBtnPark','btnParkOn']];
+  for(const [a,b] of par){ const x=document.getElementById(a); if(x) x.onclick=()=>{ const o=document.getElementById(b); if(o) o.click(); sync(); }; }
+  function sync(){ try{
+    for(const [a,b] of par){ const x=document.getElementById(a), o=document.getElementById(b); if(x&&o) x.classList.toggle('on',o.classList.contains('on')); }
+    document.body.classList.toggle('ap-3d',!!(window.__autopista&&window.__autopista.activo));
+  }catch(e){} }
+  setInterval(sync,500);
+})();
 </script>
 <script type="module">
 /* ============ MODO AUTOPISTA (provisional) ============
