@@ -508,6 +508,7 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
   <button class="ajuste on" id="btnFlechaMan">➡️ Flecha de maniobra en la calzada: ON</button>
   <button class="ajuste on" id="btnEstSol">☀️ Sol real: ON</button>
   <button class="ajuste on" id="btnEstLuz">✨ Luz y volumen: ON</button>
+  <button class="ajuste" id="btnBordes">🖍️ Bordes marcados (carreteras y zonas): OFF</button>
   <button class="ajuste on" id="btnEstVias">🛣️ Carreteras por jerarquía: ON</button>
   <button class="ajuste" id="btnEstRelieve">⛰️ Relieve sombreado: OFF</button>
   <button class="ajuste" id="btnBusqAmbito">🔎 Búsqueda: España</button>
@@ -551,7 +552,7 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v243 · AUTOPISTA (flecha redondeada y botones ⚡🅿️)</div>
+  <div class="seccion">Versión v244 · AUTOPISTA (bordes marcados y listas ⚡🅿️ en 3D)</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -623,6 +624,8 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
 <div id="minihud"><span class="vel" id="hudVel">0</span><span class="limite oculto" id="hudLimite">50</span></div>
 
 <button class="botonMapa" id="btnLimpio" title="Modo limpio y fluido">🍃</button>
+<button class="botonMapa" id="btnParkMapa" title="Parkings">P</button>
+<div id="apLista"></div>
 <div id="tramoCard"><div class="l" id="tcLim">–</div><div><div id="tcT1">Tramo</div><div class="m" id="tcT2"></div></div></div>
 <div id="sugDestino"><div class="tx"><div class="t1"></div><div class="t2"></div></div><button class="ir">Ir</button><button class="no" title="Ocultar">✕</button></div>
 <div id="grupoAbajoDer">
@@ -5822,6 +5825,12 @@ window.__carg=(function(){
       +(p.pts?'<div class="info"><b>Puntos:</b> '+p.pts+'</div>':'')
       +(estado?'<div class="info"><b>Estado:</b> '+esc(estado)+'</div>':'')+(acceso?'<div class="info"><b>Acceso:</b> '+esc(acceso)+'</div>':'')
       +(precio?'<div class="info"><b>Precio:</b> '+esc(precio.slice(0,120))+'</div>':'')
+      +(d&&d.DateLastVerified?'<div class="info"><b>Verificado:</b> '+esc(String(d.DateLastVerified).slice(0,10))+'</div>':'')
+      +(ai.ContactTelephone1?'<div class="info"><b>Teléfono:</b> '+esc(ai.ContactTelephone1)+'</div>':'')
+      +(ai.RelatedURL?'<div class="info"><b>Web:</b> '+esc(String(ai.RelatedURL).slice(0,70))+'</div>':'')
+      +(ai.AccessComments?'<div class="info"><b>Cómo llegar:</b> '+esc(String(ai.AccessComments).slice(0,200))+'</div>':'')
+      +(d&&d.GeneralComments?'<div class="info"><b>Notas:</b> '+esc(String(d.GeneralComments).slice(0,200))+'</div>':'')
+      +'<div class="info"><b>Coordenadas:</b> '+p.ll[0].toFixed(5)+', '+p.ll[1].toFixed(5)+'</div>'
       +'<div class="conectores">'+cx.map(x=>'<span class="conector">'+esc(x)+'</span>').join('')+'</div>'
       +'<div class="info" style="font-size:11px;opacity:.7">Datos de Open Charge Map (voluntarios): puede no estar libre ni al día.</div>'
       +'<div class="acciones"><button id="btnNavCarg2">🏁 Iniciar ruta</button><button class="cerrar" id="btnCerrarCarg2">✕</button></div>';
@@ -5890,7 +5899,7 @@ window.__carg=(function(){
   document.head.appendChild(st);
 
   const CATS=[['mapa','🗺️ Mapa y vista'],['aspecto','🎨 Aspecto del mapa'],['cielo','🌦️ Cielo y tiempo'],['sonido','🔊 Sonido y avisos'],['carg','⚡ Cargadores'],['park','🅿️ Aparcamientos'],['gps','📍 GPS'],['coche','🚗 Coche'],['futbol','⚽ Fútbol'],['fiesta','🎉 Celebración'],['enlace','🔗 Enlace entre dispositivos'],['inc','⚠️ Incidencias'],['sis','⚙️ Rendimiento y versión']];
-  const M={mapa:'btnEdificios btnHitos btnSenales btnPitch btnTrafico btnTraficoCalles btnModoMapa btnLuces btnCarriles btnAutoAncho btnAutoVista btnPasos btnPeajes btnTramos btnSugerido btnFlechaMan btnEstSol btnEstLuz btnEstVias btnEstRelieve btnBusqAmbito btnCamDenso btnFlechas btnPantCompleta',aspecto:'btnRelAgua btnRelVerde btnRelPuente btnAspBarrio btnAspVerde btnAspArboles btnAspAceras btnAspBorde btnAspMedir aspDiag btnAspEstacion',cielo:'btnSky btnCielo btnTiempo',sonido:'btnAvisosRadares btnObras btnVoz btnVozVol',carg:'btnListaCargadores btnCargMapa btnCargAm btnCargAz btnCargVe cargDiag btnCargTe',park:'btnParkOn btnParkGra btnParkSub btnListaParking parkDiag',gps:'btnGpsMan btnGpsAuto',coche:'btnCoche filaColorCoche btnTiltCoche',futbol:'btnListaCampos',fiesta:'btnCelebracion',enlace:'enlaceCodigo enlaceGenerar enlaceCopiar enlaceEstado',inc:'incList btnIncLimpiar btnGuardarRuta guardarRutaDiag btnAutopista btnApZoom btnPrecarga btnSuave autopistaDiag btnBanco bancoDiag btnFluidez fluDiag',sis:'btnAA btnTestTramo tramoDiag evFila btnEVPlan evPlanTxt btnTestEV evDiag btnLimpiarFavs btnWake'};
+  const M={mapa:'btnEdificios btnHitos btnSenales btnPitch btnTrafico btnTraficoCalles btnModoMapa btnLuces btnCarriles btnAutoAncho btnAutoVista btnPasos btnPeajes btnTramos btnSugerido btnFlechaMan btnEstSol btnEstLuz btnEstVias btnEstRelieve btnBusqAmbito btnCamDenso btnFlechas btnPantCompleta',aspecto:'btnRelAgua btnRelVerde btnRelPuente btnAspBarrio btnAspVerde btnAspArboles btnAspAceras btnAspBorde btnAspMedir aspDiag btnBordes btnAspEstacion',cielo:'btnSky btnCielo btnTiempo',sonido:'btnAvisosRadares btnObras btnVoz btnVozVol',carg:'btnListaCargadores btnCargMapa btnCargAm btnCargAz btnCargVe cargDiag btnCargTe',park:'btnParkOn btnParkGra btnParkSub btnListaParking parkDiag',gps:'btnGpsMan btnGpsAuto',coche:'btnCoche filaColorCoche btnTiltCoche',futbol:'btnListaCampos',fiesta:'btnCelebracion',enlace:'enlaceCodigo enlaceGenerar enlaceCopiar enlaceEstado',inc:'incList btnIncLimpiar btnGuardarRuta guardarRutaDiag btnAutopista btnApZoom btnPrecarga btnSuave autopistaDiag btnBanco bancoDiag btnFluidez fluDiag',sis:'btnAA btnTestTramo tramoDiag evFila btnEVPlan evPlanTxt btnTestEV evDiag btnLimpiarFavs btnWake'};
   const POR={}; for(const c in M) M[c].split(' ').forEach(id=>POR[id]=c);
   const cuerpos={}, cats={};
   const ref=panel.querySelector('h2');
@@ -6220,6 +6229,7 @@ window.__park=(function(){
       +(x.h?'<div class="info"><b>Horario:</b> '+esc(x.h)+'</div>':'')
       +(x.m?'<div class="info"><b>Estancia máx.:</b> '+esc(x.m)+'</div>':'')
       +(x.o?'<div class="info"><b>Gestiona:</b> '+esc(x.o)+'</div>':'')
+      +'<div class="info"><b>Coordenadas:</b> '+p[0]+', '+p[1]+'</div>'
       +'<div class="info" style="font-size:11px;opacity:.7">Datos de OpenStreetMap (voluntarios): los precios y horarios casi nunca figuran y pueden no estar al día.</div>'
       +'<div class="acciones"><button id="btnNavPark">🏁 Iniciar ruta</button><button class="cerrar" id="btnCerrarPark">✕</button></div>';
     pop.classList.add('on');
@@ -6276,7 +6286,7 @@ window.__park=(function(){
   }
   function esperar(){ if(window.map&&map.on) iniciar(); else setTimeout(esperar,400); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',esperar); else esperar();
-  return {cfg:()=>cfg,cache:()=>cache,refrescar,dibujar,clasificar};
+  return {cfg:()=>cfg,cache:()=>cache,refrescar,dibujar,clasificar,cercanos,pedir,ficha,corto,faltan:(pos)=>celdasDe(pos).filter(c=>{ const k=cache[c[0]+'_'+c[1]]; return !(k&&Date.now()-k.t<DIAS); }).slice(0,4)};
 })();
 </script>
 <script>
@@ -7412,22 +7422,154 @@ function suavizarLinea(coords, pasadas){
   b.onclick=()=>{ window.__rutaSuave=!window.__rutaSuave; try{ localStorage.setItem("rutaSuave",window.__rutaSuave?"1":"0"); }catch(e){} t(); try{ actualizarTrimRuta(); }catch(e){} }; })();
 </script>
 <style>
-#apBotones{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:21;display:none;flex-direction:column;gap:12px}
-body.ap-3d #apBotones{display:flex}
-#apBotones button{width:76px;height:76px;border-radius:20px;border:2px solid rgba(255,255,255,.35);background:rgba(27,37,48,.9);color:#fff;font:700 12px system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;box-shadow:0 6px 18px rgba(0,0,0,.35);padding:0}
-#apBotones button .i{font-size:30px;line-height:1}
-#apBotones button.on{background:#1f8f4e;border-color:#fff}
+#btnParkMapa{position:fixed;right:14px;bottom:120px;z-index:20;background:#1565c0;border-color:#fff;color:#fff;font:800 27px system-ui,Arial,sans-serif;line-height:1}
+body.noche #btnParkMapa{background:#1565c0;border-color:#fff;color:#fff}
+body.modo-solomapa #btnParkMapa,body.modo-solomapa #apLista{display:none}
+#btnParkMapa.on,#btnParkMapa.abierto,#btnCarg.abierto{box-shadow:0 0 0 3px #fff,0 0 0 5px #1e9e4a}
+#btnCarg.ap3dv{color:#fff;background:#1e9e4a;border-color:#1e9e4a}
+#popupCargador{max-height:70vh;overflow-y:auto}
+#apLista{position:fixed;top:max(56px,calc(env(safe-area-inset-top) + 48px));right:12px;z-index:27;width:min(390px,calc(100vw - 24px));max-height:64vh;overflow-y:auto;display:none;background:#fff;border-radius:14px;box-shadow:0 6px 20px rgba(60,70,80,.32);font:14px/1.35 system-ui,sans-serif;color:#222}
+#apLista.on{display:block}
+#apLista .apT{position:sticky;top:0;background:inherit;padding:10px 14px 6px;font-weight:800;font-size:15px;border-bottom:1px solid #eef1f4;z-index:1}
+#apLista .apV{padding:16px;text-align:center;color:#6b7580;font-size:13px}
+#apLista .apIt{padding:9px 12px 9px 11px;border-left:6px solid #888;border-bottom:1px solid #eef1f4}
+#apLista .f1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+#apLista .n{font-weight:700;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#apLista .chip{color:#fff;font-weight:800;font-size:12px;border-radius:8px;padding:3px 8px;white-space:nowrap}
+#apLista .f2{display:flex;justify-content:space-between;gap:8px;color:#6b7580;font-size:12px;margin-top:2px}
+#apLista .f2 span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#apLista .f2 b{white-space:nowrap;color:#444}
+#apLista .bt{display:flex;gap:8px;margin-top:7px}
+#apLista .bt button{flex:1;border:1px solid #cfd5dc;background:#eef1f4;color:#2f373f;border-radius:10px;padding:9px 0;font:700 14px system-ui,sans-serif}
+#apLista .bt button[data-a=ir]{background:#1e9e4a;border-color:#1e9e4a;color:#fff}
+body.noche #apLista{background:#232a31;color:#e8edf2;box-shadow:0 6px 20px rgba(0,0,0,.55)}
+body.noche #apLista .apT,body.noche #apLista .apIt{border-bottom-color:#323a43}
+body.noche #apLista .f2{color:#9aa5b1} body.noche #apLista .f2 b{color:#d5dce3}
+body.noche #apLista .bt button{background:#2d353d;border-color:#3a434c;color:#e8edf2}
+body.noche #apLista .bt button[data-a=ir]{background:#1e9e4a;border-color:#1e9e4a;color:#fff}
 </style>
-<div id="apBotones"><button id="apBtnCarg"><span class="i">⚡</span>Cargadores</button><button id="apBtnPark"><span class="i">🅿️</span>Parking</button></div>
 <script>
-(function(){
-  const par=[['apBtnCarg','btnCargMapa'],['apBtnPark','btnParkOn']];
-  for(const [a,b] of par){ const x=document.getElementById(a); if(x) x.onclick=()=>{ const o=document.getElementById(b); if(o) o.click(); sync(); }; }
-  function sync(){ try{
-    for(const [a,b] of par){ const x=document.getElementById(a), o=document.getElementById(b); if(x&&o) x.classList.toggle('on',o.classList.contains('on')); }
-    document.body.classList.toggle('ap-3d',!!(window.__autopista&&window.__autopista.activo));
-  }catch(e){} }
-  setInterval(sync,500);
+/* ============ v244: BORDES MARCADOS (interruptor) + LISTAS ⚡/🅿️ EN AUTOPISTA 3D ============ */
+window.__bordes=(function(){
+  const rd=(k,d)=>{ try{ const v=localStorage.getItem(k); return v===null?d:v; }catch(e){ return d; } };
+  const wr=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
+  let on=rd('bd_on','0')==='1', creadas=[], vis={};
+  const K=2.4;   /* px extra de ancho total (≈1,2 px por lado) */
+  const COL={dia:{via:'#7d8691',agua:'#7fa8c9',verde:'#85b176',suelo:'#b3bac3'},noche:{via:'#05080b',agua:'#0a1219',verde:'#0f1a13',suelo:'#0b1015'}};
+  const noche=()=>{ try{ return typeof nocheAct!=='undefined'&&!!nocheAct; }catch(e){ return false; } };
+  function sumar(e,k){
+    if(typeof e==='number') return e+k;
+    if(e&&!Array.isArray(e)&&Array.isArray(e.stops)){ const st=[]; for(const s of e.stops){ const v=sumar(s[1],k); if(v===null) return null; st.push([s[0],v]); } return Object.assign({},e,{stops:st}); }
+    if(!Array.isArray(e)) return null;
+    const op=e[0], r=[];
+    if(/^interpolate/.test(op)){ r.push(e[0],e[1],e[2]); for(let i=3;i+1<e.length;i+=2){ const v=sumar(e[i+1],k); if(v===null) return null; r.push(e[i],v); } return r; }
+    if(op==='step'){ const b=sumar(e[2],k); if(b===null) return null; r.push(e[0],e[1],b); for(let i=3;i+1<e.length;i+=2){ const v=sumar(e[i+1],k); if(v===null) return null; r.push(e[i],v); } return r; }
+    if(op==='match'){ r.push(e[0],e[1]); for(let i=2;i<e.length-1;i+=2){ const v=sumar(e[i+1],k); if(v===null) return null; r.push(e[i],v); } const d=sumar(e[e.length-1],k); if(d===null) return null; r.push(d); return r; }
+    if(op==='case'){ r.push(e[0]); for(let i=1;i<e.length-1;i+=2){ const v=sumar(e[i+1],k); if(v===null) return null; r.push(e[i],v); } const d=sumar(e[e.length-1],k); if(d===null) return null; r.push(d); return r; }
+    return null;
+  }
+  const ajeno=id=>/^(suave-|rel-|barrio-|bd-|ruta|carriles|autopista|glb)/.test(id);
+  function tipoDe(l){ const sl=l['source-layer']||''; if(l.type==='line') return 'via'; if(sl==='water') return 'agua'; if(sl==='park'||sl==='landcover'||/park|grass|wood|forest/i.test(l.id)) return 'verde'; return 'suelo'; }
+  function crear(){
+    let L; try{ L=map.getStyle().layers; }catch(e){ return; } if(!L) return;
+    const primera=L.find(l=>l.type==='line'&&l['source-layer']==='transportation'&&!ajeno(l.id)); if(!primera) return;
+    const c=noche()?COL.noche:COL.dia; creadas=[];
+    for(const l of L){
+      if(ajeno(l.id)||!l.source||!l['source-layer']) continue;
+      const sl=l['source-layer'], p=l.paint||{};
+      try{
+        if(l.type==='line'&&sl==='transportation'){
+          if(/casing|outline|border|rail|ferry|aerialway|oneway|arrow/i.test(l.id)||p['line-dasharray']||p['line-gap-width']||p['line-offset']) continue;
+          const w=sumar(p['line-width'],K); if(w===null) continue;
+          map.addLayer({id:'bd-'+l.id,type:'line',source:l.source,'source-layer':sl,filter:l.filter,minzoom:Math.max(l.minzoom||0,12),layout:{'line-join':'round','line-cap':'butt'},paint:{'line-color':c.via,'line-width':w,'line-opacity':0.9}},primera.id);
+          creadas.push({id:'bd-'+l.id,o:l.id,t:'via'});
+        } else if(l.type==='fill'&&/^(landcover|landuse|park|water)$/.test(sl)){
+          const t=tipoDe(l);
+          map.addLayer({id:'bd-'+l.id,type:'line',source:l.source,'source-layer':sl,filter:l.filter,minzoom:Math.max(l.minzoom||0,12),layout:{'line-join':'round'},paint:{'line-color':c[t],'line-width':['interpolate',['linear'],['zoom'],12,0.6,17,1.8],'line-opacity':0.85}},primera.id);
+          creadas.push({id:'bd-'+l.id,o:l.id,t});
+        }
+      }catch(e){}
+    }
+    texto();
+  }
+  function quitar(){ try{ for(const l of map.getStyle().layers) if(/^bd-/.test(l.id)) map.removeLayer(l.id); }catch(e){} creadas=[]; vis={}; texto(); }
+  function colores(n){ if(!on) return; const c=(n?COL.noche:COL.dia); for(const x of creadas){ try{ if(map.getLayer(x.id)) map.setPaintProperty(x.id,'line-color',c[x.t]); }catch(e){} } }
+  function espejo(){ for(const x of creadas){ try{ if(!map.getLayer(x.id)||!map.getLayer(x.o)) continue; const v=map.getLayoutProperty(x.o,'visibility')||'visible'; if(vis[x.id]!==v){ map.setLayoutProperty(x.id,'visibility',v); vis[x.id]=v; } }catch(e){} } }
+  function texto(){ const b=document.getElementById('btnBordes'); if(!b) return; b.textContent='🖍️ Bordes marcados (carreteras y zonas): '+(on?'ON · '+creadas.length+' capas':'OFF'); b.classList.toggle('on',on); }
+  function iniciar(){
+    const b=document.getElementById('btnBordes'); if(b) b.onclick=()=>{ on=!on; wr('bd_on',on?'1':'0'); if(on) crear(); else quitar(); texto(); };
+    texto();
+    setInterval(()=>{ try{ if(!on) return; if(!map.getStyle()) return; if(!creadas.length||!map.getLayer(creadas[0].id)) crear(); espejo(); }catch(e){} },400);
+    const o=window.pintarMapaNoche; if(typeof o==='function') window.pintarMapaNoche=function(n){ const r=o.apply(this,arguments); try{ colores(!!n); }catch(e){} return r; };
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(iniciar,500)); else setTimeout(iniciar,500);
+  return {on:()=>on,capas:()=>creadas.length,crear,quitar};
+})();
+
+window.__apLista=(function(){
+  const $=id=>document.getElementById(id);
+  const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const en3d=()=>!!(window.__autopista&&window.__autopista.activo);
+  const fmtD=d=>d<1000?(Math.round(d/10)*10)+' m':(d/1000).toFixed(1).replace('.',',')+' km';
+  let modo=null, items=[], pend=0, ult='', tmr=null;
+  function pos(){ try{ if(typeof lastFix!=='undefined'&&lastFix&&isFinite(lastFix.lat)) return [lastFix.lat,lastFix.lon]; }catch(e){} try{ return window.__carg.posicion(); }catch(e){ return null; } }
+  function render(){
+    const box=$('apLista'); if(!box||!modo) return;
+    const P=pos(); let html;
+    if(!P){ html='<div class="apT">'+(modo==='c'?'⚡ Cargadores':'🅿️ Parkings')+'</div><div class="apV">Sin posición GPS todavía…</div>'; items=[]; }
+    else{
+      try{
+        if(modo==='c'){ const C=window.__carg; items=C.cercanos(P,12).map(({p,d})=>{ const t=C.tier(p); return {tipo:'c',p,ll:p.ll,nombre:p.name,col:C.COLOR[t],chip:p.kw?p.kw+' kW':(t==='tesla'?'Tesla':'?'),desc:[p.op,(p.socks||[]).slice(0,2).join(' · '),p.pts?p.pts+' puntos':''].filter(Boolean).join(' · '),d}; }); }
+        else{ const K=window.__park; items=K.cercanos(P,12).map(({p,d})=>{ const g=p[2]==='g', x=p[5]||{}; return {tipo:'p',p,ll:[p[0],p[1]],nombre:p[3]||(g?'Parking gratuito':'Parking subterráneo'),col:g?'#1f9d55':'#1565c0',chip:K.corto(p),desc:[p[4]?p[4]+' plazas':'',g?'Superficie':'Subterráneo',x.h?x.h.slice(0,22):''].filter(Boolean).join(' · '),d}; }); }
+      }catch(e){ items=[]; }
+      html='<div class="apT">'+(modo==='c'?'⚡ Cargadores cerca':'🅿️ Parkings cerca')+(items.length?' · '+items.length:'')+'</div>';
+      if(!items.length) html+='<div class="apV">'+(pend>0||(modo==='c'&&!window.__carg.estado().n)?'Buscando…':'Nada cerca con los filtros de Ajustes.')+'</div>';
+      else html+=items.map((it,i)=>'<div class="apIt" style="border-left-color:'+it.col+'"><div class="f1"><span class="n">'+esc(it.nombre)+'</span><span class="chip" style="background:'+it.col+'">'+esc(it.chip)+'</span></div><div class="f2"><span>'+esc(it.desc||'—')+'</span><b>📍 '+fmtD(it.d)+'</b></div><div class="bt"><button data-a="ir" data-k="'+i+'">🏁 Ir</button><button data-a="info" data-k="'+i+'">ℹ️ Info</button></div></div>').join('')+(pend>0?'<div class="apV">⏳ buscando más…</div>':'');
+    }
+    if(html!==ult){ const y=box.scrollTop; box.innerHTML=html; box.scrollTop=y; ult=html; }
+  }
+  function marcar(){ const c=$('btnCarg'), p=$('btnParkMapa'); if(c) c.classList.toggle('abierto',modo==='c'); if(p) p.classList.toggle('abierto',modo==='p'); }
+  function cerrar(){ modo=null; ult=''; clearInterval(tmr); tmr=null; const b=$('apLista'); if(b) b.classList.remove('on'); marcar(); }
+  function cerrarTodo(){ cerrar(); const p=$('popupCargador'); if(p) p.classList.remove('on'); }
+  function abrir(m){
+    if(modo===m){ cerrar(); return; }
+    const pp=$('popupCargador'); if(pp) pp.classList.remove('on');
+    modo=m; ult=''; pend=0; $('apLista').classList.add('on'); marcar(); render();
+    clearInterval(tmr); tmr=setInterval(render,3000);
+    const P=pos(); if(!P) return;
+    if(m==='c'){ try{ if(!window.__carg.estado().n) window.__carg.asegurar(P).then(render).catch(()=>{}); }catch(e){} }
+    else{ try{ const K=window.__park, falta=K.faltan(P); pend=falta.length; for(const c of falta){ K.pedir((c[0]+.5)*0.02,(c[1]+.5)*0.02,true).catch(()=>{}).then(()=>{ pend--; render(); }); } }catch(e){} }
+  }
+  function iniciar(){
+    /* en autopista 3D, ⚡ y 🅿️ abren la lista en vez de poner/quitar iconos */
+    document.addEventListener('click',e=>{
+      const t=e.target&&e.target.closest?e.target.closest('#btnCarg,#btnParkMapa'):null; if(!t) return;
+      if(t.id==='btnCarg'){ if(en3d()){ e.stopImmediatePropagation(); e.preventDefault(); abrir('c'); } }
+      else{ e.stopImmediatePropagation(); e.preventDefault(); if(en3d()) abrir('p'); else { const o=$('btnParkOn'); if(o) o.click(); } }
+    },true);
+    $('apLista').addEventListener('click',e=>{
+      const b=e.target.closest&&e.target.closest('button[data-a]'); if(!b) return; const it=items[+b.dataset.k]; if(!it) return;
+      cerrar();
+      if(b.dataset.a==='ir'){ try{ navegarA(it.ll[0],it.ll[1],it.nombre,it.tipo==='c'?'cargador':'parking'); }catch(err){} }
+      else{ try{ if(it.tipo==='c') window.__carg.abrir(it.p); else window.__park.ficha(it.p); }catch(err){} }
+    });
+    /* tocar fuera de la lista o de la ficha cierra */
+    document.addEventListener('pointerdown',e=>{
+      if(!en3d()) return; const t=e.target; if(!t||!t.closest) return;
+      if(t.closest('#apLista,#popupCargador,#btnCarg,#btnParkMapa')) return;
+      const pp=$('popupCargador'); if(modo||(pp&&pp.classList.contains('on'))) cerrarTodo();
+    },true);
+    setInterval(()=>{ try{
+      const a=en3d(); document.body.classList.toggle('ap-3d',a);
+      const c=$('btnCarg'); if(c) c.classList.toggle('ap3dv',a);
+      const p=$('btnParkMapa'); if(p){ let v=false; try{ v=!!window.__park.cfg().on; }catch(e){} p.classList.toggle('on',v&&!a); }
+      /* en 3D los iconos del mapa no sirven: se ocultan (y se restauran al salir) */
+      for(const id of ['cargadores-next','cargadores-sc','parking-next']){ if(!map.getLayer(id)) continue; const w=a?'none':'visible'; if(map.getLayoutProperty(id,'visibility')!==w) map.setLayoutProperty(id,'visibility',w); }
+      if(!a&&(modo)) cerrar();
+    }catch(e){} },400);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(iniciar,600)); else setTimeout(iniciar,600);
+  return {abrir,cerrar};
 })();
 </script>
 <script type="module">
