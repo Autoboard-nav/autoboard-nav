@@ -552,7 +552,7 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v244 · AUTOPISTA (bordes marcados y listas ⚡🅿️ en 3D)</div>
+  <div class="seccion">Versión v245 · AUTOPISTA (bordes marcados con color visible de noche)</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -7455,7 +7455,7 @@ window.__bordes=(function(){
   const wr=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
   let on=rd('bd_on','0')==='1', creadas=[], vis={};
   const K=2.4;   /* px extra de ancho total (≈1,2 px por lado) */
-  const COL={dia:{via:'#7d8691',agua:'#7fa8c9',verde:'#85b176',suelo:'#b3bac3'},noche:{via:'#05080b',agua:'#0a1219',verde:'#0f1a13',suelo:'#0b1015'}};
+  const COL={dia:{via:'#7d8691',agua:'#7fa8c9',verde:'#85b176',suelo:'#b3bac3'},noche:{via:'#566373',agua:'#2f6d94',verde:'#3d8052',suelo:'#4b5763'}};
   const noche=()=>{ try{ return typeof nocheAct!=='undefined'&&!!nocheAct; }catch(e){ return false; } };
   function sumar(e,k){
     if(typeof e==='number') return e+k;
