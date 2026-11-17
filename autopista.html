@@ -544,13 +544,14 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
   <button class="ajuste" id="btnAutopista" style="background:#27384a">🛣️ Modo autopista</button>
   <button class="ajuste" id="btnApZoom" style="background:#27384a">🔍 Zoom en autopista</button>
   <button class="ajuste" id="btnPrecarga" style="background:#27384a">📡 Precarga de teselas</button>
+  <button class="ajuste" id="btnSuave" style="background:#27384a">〰️ Ruta azul suavizada</button>
   <div id="autopistaDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste" id="btnBanco" style="background:#27384a">🧪 Banco de pruebas de capas (~3 min, simulación)</button>
   <div id="bancoDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v240 · AUTOPISTA (precarga de teselas)</div>
+  <div class="seccion">Versión v242 · AUTOPISTA (ruta azul suavizada)</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -807,7 +808,7 @@ function colorPotencia(kw){if(kw>72) return '#d32f2f';if(kw>=50) return '#ff6f00
 /* ========== CONSTANTES v77 ========== */
 const ZOOM_CIUDAD = 19.2;
 const ZOOM_CARRETERA = 18.0;
-const ZOOM_MANIOBRA = 21.2;   /* zoom máximo en un giro (antes 20.5). Rango útil probado en mapa: 20.5–21.0 */
+const ZOOM_MANIOBRA = 20.8;   /* zoom máximo en un giro (antes 20.5). Rango útil probado en mapa: 20.5–21.0 */
 const ZOOM_VEL_BAJA = 25;
 const ZOOM_VEL_ALTA = 90;
 const PITCH_NAV_BASE = 74;   /* circulando por ciudad (referencia codriver.io). Con el coche al 65 %, el horizonte asoma desde ~67°; a 74° el cielo ocupa ~20 % */
@@ -1127,6 +1128,9 @@ map.on('load',()=>{
 
   /* RUTA — halo blanco + base azul sólida + colores tráfico encima */
   map.addSource('ruta',{type:'geojson',data:{type:'FeatureCollection',features:[]},lineMetrics:true});
+  /* v242: la línea azul se dibuja suavizada (arcos en las esquinas y rotondas); los datos de la ruta no cambian */
+  try{ const __s=map.getSource('ruta'), __sd=__s.setData.bind(__s);
+    __s.setData=function(d){ try{ if(window.__rutaSuave!==false && d && Array.isArray(d.features)) d={...d,features:d.features.map(f=>(f.geometry&&f.geometry.type==='LineString')?{...f,geometry:{type:'LineString',coordinates:suavizarLinea(f.geometry.coordinates,2)}}:f)}; }catch(e){} return __sd(d); }; }catch(e){}
 
   /* Ruta ya recorrida: la ruta ENTERA en gris DEBAJO del azul. Como el azul empieza justo bajo el coche,
      lo que dejas atrás se queda en gris sin ningún cálculo extra. */
@@ -5886,7 +5890,7 @@ window.__carg=(function(){
   document.head.appendChild(st);
 
   const CATS=[['mapa','🗺️ Mapa y vista'],['aspecto','🎨 Aspecto del mapa'],['cielo','🌦️ Cielo y tiempo'],['sonido','🔊 Sonido y avisos'],['carg','⚡ Cargadores'],['park','🅿️ Aparcamientos'],['gps','📍 GPS'],['coche','🚗 Coche'],['futbol','⚽ Fútbol'],['fiesta','🎉 Celebración'],['enlace','🔗 Enlace entre dispositivos'],['inc','⚠️ Incidencias'],['sis','⚙️ Rendimiento y versión']];
-  const M={mapa:'btnEdificios btnHitos btnSenales btnPitch btnTrafico btnTraficoCalles btnModoMapa btnLuces btnCarriles btnAutoAncho btnAutoVista btnPasos btnPeajes btnTramos btnSugerido btnFlechaMan btnEstSol btnEstLuz btnEstVias btnEstRelieve btnBusqAmbito btnCamDenso btnFlechas btnPantCompleta',aspecto:'btnRelAgua btnRelVerde btnRelPuente btnAspBarrio btnAspVerde btnAspArboles btnAspAceras btnAspBorde btnAspMedir aspDiag btnAspEstacion',cielo:'btnSky btnCielo btnTiempo',sonido:'btnAvisosRadares btnObras btnVoz btnVozVol',carg:'btnListaCargadores btnCargMapa btnCargAm btnCargAz btnCargVe cargDiag btnCargTe',park:'btnParkOn btnParkGra btnParkSub btnListaParking parkDiag',gps:'btnGpsMan btnGpsAuto',coche:'btnCoche filaColorCoche btnTiltCoche',futbol:'btnListaCampos',fiesta:'btnCelebracion',enlace:'enlaceCodigo enlaceGenerar enlaceCopiar enlaceEstado',inc:'incList btnIncLimpiar btnGuardarRuta guardarRutaDiag btnAutopista btnApZoom btnPrecarga autopistaDiag btnBanco bancoDiag btnFluidez fluDiag',sis:'btnAA btnTestTramo tramoDiag evFila btnEVPlan evPlanTxt btnTestEV evDiag btnLimpiarFavs btnWake'};
+  const M={mapa:'btnEdificios btnHitos btnSenales btnPitch btnTrafico btnTraficoCalles btnModoMapa btnLuces btnCarriles btnAutoAncho btnAutoVista btnPasos btnPeajes btnTramos btnSugerido btnFlechaMan btnEstSol btnEstLuz btnEstVias btnEstRelieve btnBusqAmbito btnCamDenso btnFlechas btnPantCompleta',aspecto:'btnRelAgua btnRelVerde btnRelPuente btnAspBarrio btnAspVerde btnAspArboles btnAspAceras btnAspBorde btnAspMedir aspDiag btnAspEstacion',cielo:'btnSky btnCielo btnTiempo',sonido:'btnAvisosRadares btnObras btnVoz btnVozVol',carg:'btnListaCargadores btnCargMapa btnCargAm btnCargAz btnCargVe cargDiag btnCargTe',park:'btnParkOn btnParkGra btnParkSub btnListaParking parkDiag',gps:'btnGpsMan btnGpsAuto',coche:'btnCoche filaColorCoche btnTiltCoche',futbol:'btnListaCampos',fiesta:'btnCelebracion',enlace:'enlaceCodigo enlaceGenerar enlaceCopiar enlaceEstado',inc:'incList btnIncLimpiar btnGuardarRuta guardarRutaDiag btnAutopista btnApZoom btnPrecarga btnSuave autopistaDiag btnBanco bancoDiag btnFluidez fluDiag',sis:'btnAA btnTestTramo tramoDiag evFila btnEVPlan evPlanTxt btnTestEV evDiag btnLimpiarFavs btnWake'};
   const POR={}; for(const c in M) M[c].split(' ').forEach(id=>POR[id]=c);
   const cuerpos={}, cats={};
   const ref=panel.querySelector('h2');
@@ -7373,6 +7377,38 @@ window.__CLIPS_VOZ.radar='SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAAAAAA
     }catch(e){ out.textContent='Error al guardar: '+e.message; }
   };
 })();
+</script>
+<script>
+/* Suavizado de la línea de ruta (solo dibujo): esquinas con arco tangente a los dos tramos rectos; no se mueve ningún dato de la ruta */
+function suavizarLinea(coords, pasadas){
+  if(!coords || coords.length<3) return coords;
+  const KY=110540;
+  for(let p=0;p<(pasadas||2);p++){
+    const n=coords.length; if(n<3) break;
+    const kx=111320*Math.cos(coords[0][1]*Math.PI/180);
+    const X=c=>c[0]*kx, Y=c=>c[1]*KY;
+    const out=[coords[0]];
+    for(let i=1;i<n-1;i++){
+      const A=coords[i-1], V=coords[i], B=coords[i+1];
+      const ax=X(A)-X(V), ay=Y(A)-Y(V), bx=X(B)-X(V), by=Y(B)-Y(V);
+      const la=Math.hypot(ax,ay), lb=Math.hypot(bx,by);
+      if(la<0.5||lb<0.5){ out.push(V); continue; }
+      const cos=(ax*bx+ay*by)/(la*lb), ang=Math.PI-Math.acos(Math.max(-1,Math.min(1,cos)));   /* desvío respecto a ir recto, en rad */
+      if(ang<0.02){ out.push(V); continue; }
+      const rmax = ang<0.45 ? 70 : (ang<1.0 ? 30 : 14);
+      const d=Math.min(rmax,0.45*la,0.45*lb);
+      const P=[V[0]+(A[0]-V[0])*d/la, V[1]+(A[1]-V[1])*d/la], Q=[V[0]+(B[0]-V[0])*d/lb, V[1]+(B[1]-V[1])*d/lb];
+      const k=Math.max(2,Math.min(10,Math.ceil(ang/0.12)));
+      for(let s=0;s<=k;s++){ const t=s/k, u=1-t; out.push([u*u*P[0]+2*u*t*V[0]+t*t*Q[0], u*u*P[1]+2*u*t*V[1]+t*t*Q[1]]); }
+    }
+    out.push(coords[n-1]); coords=out;
+  }
+  return coords;
+}
+
+(function(){ let on=true; try{ on=localStorage.getItem("rutaSuave")!=="0"; }catch(e){} window.__rutaSuave=on;
+  const b=document.getElementById("btnSuave"); if(!b) return; const t=()=>{ b.textContent="〰️ Ruta azul suavizada: "+(window.__rutaSuave?"ON":"OFF"); }; t();
+  b.onclick=()=>{ window.__rutaSuave=!window.__rutaSuave; try{ localStorage.setItem("rutaSuave",window.__rutaSuave?"1":"0"); }catch(e){} t(); try{ actualizarTrimRuta(); }catch(e){} }; })();
 </script>
 <script type="module">
 /* ============ MODO AUTOPISTA (provisional) ============
