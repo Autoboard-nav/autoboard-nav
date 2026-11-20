@@ -554,7 +554,7 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v247 · AUTOPISTA (fotos de carriles + diag carriles)</div>
+  <div class="seccion">Versión v248 · AUTOPISTA (fotos de carriles: 2 carriles azules en 4 y 5 carriles)</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -2075,12 +2075,13 @@ const FOTOS_CARRIL_ON = () => { try { return localStorage.getItem('fotos_carril_
 const FOTOS_CARRIL = {
   derecha:{ '2|1':'salida-1-de-2-derecha', '3|2':'salida-3-carriles-1-derecha', '3|1,2':'salida-2-de-3-derecha', '4|2,3':'salida-2-de-4-derecha-2-flechas' },
   izquierda:{ '2|0':'salida-1-de-2-izquierda', '3|0':'salida-3-carriles-1-izquierda', '3|0,1':'salida-2-de-3-izquierda', '4|0,1':'salida-2-de-4-izquierda-2-flechas' },
-  frente:{ '2|1':'frente-2-carriles-1-derecha', '2|0':'frente-2-carriles-1-izquierda', '3|2':'frente-3-carriles-1-derecha', '3|0':'frente-3-carriles-1-izquierda', '4|3':'frente-4-carriles-1-derecha', '4|0':'frente-4-carriles-1-izquierda' }
+  frente:{ '2|1':'frente-2-carriles-1-derecha', '2|0':'frente-2-carriles-1-izquierda', '3|2':'frente-3-carriles-1-derecha', '3|0':'frente-3-carriles-1-izquierda', '4|3':'frente-4-carriles-1-derecha', '4|0':'frente-4-carriles-1-izquierda',
+    '4|2,3':'ia-azul-derecha-2-carriles', '4|0,1':'ia-azul-izquierda-2-carriles', '5|3,4':'caso05-incorporacion-3-carriles-derecha', '5|0,1':'caso05-incorporacion-3-carriles-izquierda' }
 };
 function fotoCarrilPara(s){
   if(!s||!s.hw||!s.maneuver||s.maneuver.type!=='turn'||!Array.isArray(s.lanes)) return null;
   const n=s.lanes.length, act=[]; s.lanes.forEach((l,i)=>{ if(l&&l.lane&&l.lane.active) act.push(i); });
-  if(n<2||n>4||!act.length||act.length===n) return null;
+  if(n<2||n>5||!act.length||act.length===n) return null;
   const mod=String(s.maneuver.modifier||'straight'), lado=/right/.test(mod)?'derecha':(/left/.test(mod)?'izquierda':'frente');
   const f=(FOTOS_CARRIL[lado]||{})[n+'|'+act.join(',')];
   return f?'carriles/'+f+'.jpg':null;
