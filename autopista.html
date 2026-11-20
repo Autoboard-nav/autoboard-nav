@@ -414,6 +414,23 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
 </div>
 
 <div id="radarAlerta"></div>
+<style>
+#radarInfo .senalRadar{cursor:pointer;-webkit-user-select:none;user-select:none;touch-action:manipulation}
+#radEd{position:fixed;left:50%;transform:translateX(-50%);bottom:90px;z-index:46;width:min(470px,94vw);background:#fff;color:#222;border-radius:16px;box-shadow:0 8px 28px rgba(0,0,0,.38);padding:14px 14px 12px;font:15px/1.35 system-ui,sans-serif;display:none}
+#radEd.on{display:block}
+#radEd h3{margin:0 0 4px;font-size:17px}
+#radEd .sub{color:#6b7580;font-size:12px;margin-bottom:8px}
+#radEd .fila{display:flex;flex-wrap:wrap;gap:7px;margin:6px 0}
+#radEd .chip{border:2px solid #cfd5dc;background:#eef1f4;color:#2f373f;border-radius:10px;padding:10px 0;min-width:52px;text-align:center;font:700 16px system-ui,sans-serif;flex:1 0 52px}
+#radEd .chip.sel{background:#1565c0;border-color:#1565c0;color:#fff}
+#radEd .chip.tipo{flex:1 0 90px;font-size:14px}
+#radEd .acc{display:flex;gap:8px;margin-top:10px}
+#radEd .acc button{flex:1;border:0;border-radius:12px;padding:13px 0;font:800 15px system-ui,sans-serif;color:#fff;background:#6b7580}
+#radEd .acc .gua{background:#1e9e4a} #radEd .acc .bor{background:#d32f2f} #radEd .acc .res{background:#ef8f00}
+body.noche #radEd{background:#232a31;color:#e8edf2} body.noche #radEd .sub{color:#9aa5b1}
+body.noche #radEd .chip{background:#2d353d;border-color:#3a434c;color:#e8edf2} body.noche #radEd .chip.sel{background:#1565c0;border-color:#1565c0;color:#fff}
+</style>
+<div id="radEd"></div>
 <div id="radarInfo">
   <div class="senalRadar" id="senalRadar">-</div>
   <div class="dist" id="radarDist">-</div>
@@ -503,6 +520,9 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
   <button class="ajuste" id="btnAspEstacion">🍂 Estación: Auto</button>
   <button class="ajuste on" id="btnPasos">🚸 Pasos de peatones: ON</button>
   <button class="ajuste" id="btnPeajes">🚫 Evitar peajes: OFF</button>
+  <button class="ajuste" id="btnVerRadares">📍 Ver radares en el mapa: OFF</button>
+  <div id="radEdInfo" style="font-size:11px;opacity:.8;padding:2px 14px"></div>
+  <button class="ajuste" id="btnRadReset">↩️ Restablecer radares editados</button>
   <button class="ajuste on" id="btnTramos">📏 Radares de tramo (media): ON</button>
   <button class="ajuste on" id="btnSugerido">🕘 Destino sugerido: ON</button>
   <button class="ajuste on" id="btnFotosCarriles">🖼️ Fotos de carriles bajo los carteles: ON</button>
@@ -554,7 +574,7 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v250 · AUTOPISTA (carriles: aviso breve y fijo a menos de 2 km)</div>
+  <div class="seccion">Versión v251 · AUTOPISTA (radares editables)</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -1213,24 +1233,137 @@ map.on('load',()=>{
   actualizarBotonCasa();
 });
 
+/* ===== v251: radares editables (límite, tipo, borrar, añadir). Pulsación larga en la señal del aviso, en un radar visible o en un punto del mapa.
+   Los cambios se guardan SOLO en este navegador (localStorage 'rad_edits') como capa sobre assets/radares.json; "Restablecer" los borra. ===== */
+let radaresBase=null, __radAct=null, __radEdIni=false;
+const radKey=r=>(+r.lat).toFixed(5)+','+(+r.lon).toFixed(5);
+function radEdLeer(){ try{ const o=JSON.parse(localStorage.getItem('rad_edits')||'null'); if(o&&typeof o==='object') return {mod:o.mod||{},del:Array.isArray(o.del)?o.del:[],add:Array.isArray(o.add)?o.add:[]}; }catch(e){} return {mod:{},del:[],add:[]}; }
+function radEdGuardar(e){ try{ localStorage.setItem('rad_edits',JSON.stringify(e)); }catch(err){} }
+function radAplicar(base){
+  const e=radEdLeer(), del=new Set(e.del), out=[];
+  for(const r of base){ const k=radKey(r); if(del.has(k)) continue; const m=e.mod[k]; out.push(m?Object.assign({},r,m):r); }
+  for(const a of e.add) out.push(a);
+  return out;
+}
+function radFeatures(datos){
+  return datos.map((rd,i)=>{
+    let tipo=String(rd.t||'fijo').toLowerCase().trim();
+    if(tipo.includes('tramo')) tipo='tramo';
+    else if(tipo.includes('movil')||tipo.includes('móvil')) tipo='movil';
+    else if(tipo.includes('semaforo')||tipo.includes('semáforo')) tipo='semaforo';
+    else tipo='fijo';
+    let v=Number(rd.max);
+    if(!Number.isFinite(v)||v<=0||v>200) v=50;
+    if(v<=40) v=40;else if(v<=50) v=50;else if(v<=60) v=60;else if(v<=70) v=70;
+    else if(v<=80) v=80;else if(v<=90) v=90;else if(v<=100) v=100;else if(v<=110) v=110;else v=120;
+    return {type:'Feature',geometry:{type:'Point',coordinates:[rd.lon,rd.lat]},properties:{idx:i,tipo:tipo,velocidad:v}};
+  });
+}
+function radInfoTexto(){
+  const e=radEdLeer(), el=document.getElementById('radEdInfo'); if(!el) return;
+  el.textContent='Radares editados: '+Object.keys(e.mod).length+' cambiados · '+e.del.length+' borrados · '+e.add.length+' añadidos (solo en este navegador). Mantén pulsada la señal del aviso de radar, un radar visible o un punto del mapa.';
+}
+function radRefrescar(){
+  if(!radaresBase) return;
+  radaresCargados=radAplicar(radaresBase);
+  try{ const s=map.getSource('radares'); if(s) s.setData({type:'FeatureCollection',features:radFeatures(radaresCargados)}); }catch(e){}
+  try{ document.getElementById('rRadares').innerHTML='<b>'+radaresCargados.length+'</b> (solo aviso)'; }catch(e){}
+  radInfoTexto(); __radAct=null;
+}
+let __radEd=null;
+function radCerrarEditor(){ __radEd=null; const el=document.getElementById('radEd'); if(el) el.classList.remove('on'); }
+function radPintarEditor(){
+  const el=document.getElementById('radEd'), E=__radEd; if(!el||!E) return;
+  const TIPOS=[['fijo','Fijo'],['tramo','Tramo'],['movil','Móvil'],['semaforo','Semáforo']], LIMS=[40,50,60,70,80,90,100,110,120];
+  el.innerHTML='<h3>'+(E.nuevo?'Añadir radar aquí':'Editar radar')+'</h3><div class="sub">'+(E.nuevo?'Se guarda en este navegador':('Original: '+(E.origMax||'?')+' km/h · '+(E.origT||'fijo')+(E.rd&&E.rd.a?' · añadido por ti':'')))+'</div>'
+    +'<div class="fila">'+TIPOS.map(t=>'<div class="chip tipo'+(E.t===t[0]?' sel':'')+'" data-t="'+t[0]+'">'+t[1]+'</div>').join('')+'</div>'
+    +'<div class="fila">'+LIMS.map(v=>'<div class="chip'+(E.max===v?' sel':'')+'" data-v="'+v+'">'+v+'</div>').join('')+'</div>'
+    +'<div class="acc"><button class="gua" data-a="gua">Guardar</button>'
+    +(E.nuevo?'':'<button class="bor" data-a="bor">Borrar</button>')
+    +((!E.nuevo&&E.modificado)?'<button class="res" data-a="res">Original</button>':'')
+    +'<button data-a="can">Cancelar</button></div>';
+}
+function radAbrirEditor(rd,lat,lon){
+  const nuevo=!rd, e=radEdLeer();
+  let origMax=null, origT=null, modificado=false;
+  if(rd){
+    const k=radKey(rd);
+    if(!rd.a){ const b=(radaresBase||[]).find(x=>radKey(x)===k); if(b){ origMax=b.max; origT=b.t; } modificado=!!e.mod[k]; }
+  }
+  const t=String((rd&&rd.t)||'fijo').toLowerCase().includes('tramo')?'tramo':(/m[oó]vil/i.test(String((rd&&rd.t)||''))?'movil':(/sem[aá]foro/i.test(String((rd&&rd.t)||''))?'semaforo':'fijo'));
+  let mx=Number(rd&&rd.max); if(!Number.isFinite(mx)||mx<=0) mx=50; mx=[40,50,60,70,80,90,100,110,120].reduce((a,b)=>Math.abs(b-mx)<Math.abs(a-mx)?b:a);
+  __radEd={rd:rd||null,nuevo,lat:rd?rd.lat:lat,lon:rd?rd.lon:lon,t,max:mx,origMax,origT,modificado};
+  radPintarEditor(); document.getElementById('radEd').classList.add('on');
+}
+function radAccion(a){
+  const E=__radEd; if(!E) return;
+  const e=radEdLeer();
+  if(a==='gua'){
+    if(E.nuevo) e.add.push({lat:+(+E.lat).toFixed(5),lon:+(+E.lon).toFixed(5),max:E.max,t:E.t,a:1});
+    else if(E.rd.a){ const k=radKey(E.rd), x=e.add.find(r=>radKey(r)===k); if(x){ x.max=E.max; x.t=E.t; } }
+    else e.mod[radKey(E.rd)]={max:E.max,t:E.t};
+  } else if(a==='bor'){
+    const k=radKey(E.rd);
+    if(E.rd.a) e.add=e.add.filter(r=>radKey(r)!==k); else { if(!e.del.includes(k)) e.del.push(k); delete e.mod[k]; }
+  } else if(a==='res'){ delete e.mod[radKey(E.rd)]; }
+  if(a!=='can') { radEdGuardar(e); radRefrescar(); }
+  radCerrarEditor();
+}
+function radIniciarEdicion(){
+  if(__radEdIni) return; __radEdIni=true;
+  const ed=document.getElementById('radEd');
+  ed.addEventListener('click',ev=>{
+    const c=ev.target.closest&&ev.target.closest('[data-t],[data-v],[data-a]'); if(!c||!__radEd) return;
+    if(c.dataset.t){ __radEd.t=c.dataset.t; radPintarEditor(); }
+    else if(c.dataset.v){ __radEd.max=+c.dataset.v; radPintarEditor(); }
+    else radAccion(c.dataset.a);
+  });
+  document.addEventListener('pointerdown',ev=>{ if(__radEd&&!ev.target.closest('#radEd')) radCerrarEditor(); },true);
+  /* pulsación larga en la señal del aviso de radar */
+  const sig=document.getElementById('radarInfo'); let t0=null;
+  const stop=()=>{ if(t0){ clearTimeout(t0); t0=null; } };
+  sig.addEventListener('pointerdown',()=>{ stop(); t0=setTimeout(()=>{ t0=null; if(__radAct){ try{ navigator.vibrate&&navigator.vibrate(40); }catch(e){} radAbrirEditor(__radAct); } },650); });
+  ['pointerup','pointerleave','pointercancel'].forEach(n=>sig.addEventListener(n,stop));
+  /* pulsación larga en el mapa: radar visible -> editar; punto vacío -> añadir */
+  let lp=null, tTouch=0;
+  const cancel=()=>{ if(lp){ clearTimeout(lp.t); lp=null; } };
+  const empezar=e=>{
+    cancel(); if(e.originalEvent&&e.originalEvent.touches&&e.originalEvent.touches.length>1) return;
+    const x=e.point.x, y=e.point.y;
+    lp={x,y,t:setTimeout(()=>{
+      lp=null;
+      let rd=null;
+      try{ const fs=map.queryRenderedFeatures([[x-20,y-20],[x+20,y+20]],{layers:['radares','radares-circulo']}); if(fs.length) rd=radaresCargados[fs[0].properties.idx]||null; }catch(err){}
+      const ll=map.unproject([x,y]);
+      if(!rd&&map.getZoom()<12) return;   /* para añadir hace falta algo de zoom */
+      try{ navigator.vibrate&&navigator.vibrate(40); }catch(err){}
+      radAbrirEditor(rd,ll.lat,ll.lng);
+    },700)};
+  };
+  map.on('touchstart',e=>{ tTouch=Date.now(); empezar(e); });
+  map.on('mousedown',e=>{ if(Date.now()-tTouch<1200) return; empezar(e); });
+  map.on('touchmove',e=>{ if(lp&&Math.hypot(e.point.x-lp.x,e.point.y-lp.y)>12) cancel(); });
+  map.on('mousemove',e=>{ if(lp&&Math.hypot(e.point.x-lp.x,e.point.y-lp.y)>12) cancel(); });
+  ['touchend','touchcancel','mouseup','dragstart','zoomstart','rotatestart','pitchstart'].forEach(n=>map.on(n,cancel));
+  /* Ajustes: ver radares en el mapa + restablecer */
+  const bv=document.getElementById('btnVerRadares'), rd0=()=>{ try{ return localStorage.getItem('rad_ver')==='1'; }catch(e){ return false; } };
+  const aplicarVer=()=>{ const v=rd0(); for(const id of ['radares-circulo','radares']){ try{ if(map.getLayer(id)) map.setLayoutProperty(id,'visibility',v?'visible':'none'); }catch(e){} } if(bv){ bv.textContent='📍 Ver radares en el mapa: '+(v?'ON':'OFF'); bv.classList.toggle('on',v); } };
+  if(bv) bv.onclick=()=>{ try{ localStorage.setItem('rad_ver',rd0()?'0':'1'); }catch(e){} aplicarVer(); };
+  aplicarVer();
+  const br=document.getElementById('btnRadReset'); let tr=null;
+  if(br) br.onclick=()=>{
+    if(!tr){ br.textContent='⚠️ Pulsa otra vez para borrar TODOS tus cambios de radares'; tr=setTimeout(()=>{ tr=null; br.textContent='↩️ Restablecer radares editados'; },4000); return; }
+    clearTimeout(tr); tr=null; radEdGuardar({mod:{},del:[],add:[]}); radRefrescar(); br.textContent='↩️ Restablecer radares editados';
+  };
+  radInfoTexto();
+}
 async function cargarRadares(){
   try{
     const r=await fetch('./assets/radares.json');
     if(!r.ok) throw new Error('HTTP '+r.status);
     const datos=await r.json();
-    radaresCargados=datos;
-    const features=datos.map((rd,i)=>{
-      let tipo=String(rd.t||'fijo').toLowerCase().trim();
-      if(tipo.includes('tramo')) tipo='tramo';
-      else if(tipo.includes('movil')||tipo.includes('móvil')) tipo='movil';
-      else if(tipo.includes('semaforo')||tipo.includes('semáforo')) tipo='semaforo';
-      else tipo='fijo';
-      let v=Number(rd.max);
-      if(!Number.isFinite(v)||v<=0||v>200) v=50;
-      if(v<=40) v=40;else if(v<=50) v=50;else if(v<=60) v=60;else if(v<=70) v=70;
-      else if(v<=80) v=80;else if(v<=90) v=90;else if(v<=100) v=100;else if(v<=110) v=110;else v=120;
-      return {type:'Feature',geometry:{type:'Point',coordinates:[rd.lon,rd.lat]},properties:{idx:i,tipo:tipo,velocidad:v}};
-    });
+    radaresBase=datos; radaresCargados=radAplicar(datos);
+    const features=radFeatures(radaresCargados);
     map.addSource('radares',{type:'geojson',data:{type:'FeatureCollection',features:features}});
     map.addLayer({id:'radares-circulo',type:'circle',source:'radares',minzoom:11,
       layout:{'visibility':'none'},
@@ -1241,7 +1374,8 @@ async function cargarRadares(){
       layout:{'visibility':'none','icon-image':['concat','radar-',['get','tipo'],'-',['to-string',['get','velocidad']]],
         'icon-size':['interpolate',['linear'],['zoom'],14,0.35,17,0.5,20,0.65],
         'icon-allow-overlap':true,'icon-ignore-placement':true}});
-    document.getElementById('rRadares').innerHTML='<b>'+datos.length+'</b> (solo aviso)';
+    document.getElementById('rRadares').innerHTML='<b>'+radaresCargados.length+'</b> (solo aviso)';
+    try{ radIniciarEdicion(); }catch(e){ try{ registrarError('radares-edit',e.message); }catch(_){} }
   }catch(e){
     document.getElementById('rRadares').innerHTML='<span class="mal">error: '+e.message+'</span>';
   }
@@ -1387,6 +1521,7 @@ function comprobarRadaresCercanos(lat,lon,velocidadActualKmh){
   }
   const g9=document.getElementById('g9');
   if(!masCercano||distMin>RADAR_DIST_APAGADO){apagarAlertaRadar();g9.textContent='-';return;}
+  __radAct=masCercano;
   const limRadar=Number(masCercano.max)||50;
   g9.textContent=Math.round(distMin)+' m · '+limRadar+' km/h';
   if(distMin<RADAR_DIST_AVISO){
@@ -5952,7 +6087,7 @@ window.__carg=(function(){
   document.head.appendChild(st);
 
   const CATS=[['mapa','🗺️ Mapa y vista'],['aspecto','🎨 Aspecto del mapa'],['cielo','🌦️ Cielo y tiempo'],['sonido','🔊 Sonido y avisos'],['carg','⚡ Cargadores'],['park','🅿️ Aparcamientos'],['gps','📍 GPS'],['coche','🚗 Coche'],['futbol','⚽ Fútbol'],['fiesta','🎉 Celebración'],['enlace','🔗 Enlace entre dispositivos'],['inc','⚠️ Incidencias'],['sis','⚙️ Rendimiento y versión']];
-  const M={mapa:'btnEdificios btnHitos btnSenales btnPitch btnTrafico btnTraficoCalles btnModoMapa btnLuces btnCarriles btnAutoAncho btnAutoVista btnPasos btnPeajes btnTramos btnSugerido btnFlechaMan btnFotosCarriles carrilDiag btnEstSol btnEstLuz btnEstVias btnEstRelieve btnBusqAmbito btnCamDenso btnFlechas btnPantCompleta',aspecto:'btnRelAgua btnRelVerde btnRelPuente btnAspBarrio btnAspVerde btnAspArboles btnAspAceras btnAspBorde btnAspMedir aspDiag btnBordes btnAspEstacion',cielo:'btnSky btnCielo btnTiempo',sonido:'btnAvisosRadares btnObras btnVoz btnVozVol',carg:'btnListaCargadores btnCargMapa btnCargAm btnCargAz btnCargVe cargDiag btnCargTe',park:'btnParkOn btnParkGra btnParkSub btnListaParking parkDiag',gps:'btnGpsMan btnGpsAuto',coche:'btnCoche filaColorCoche btnTiltCoche',futbol:'btnListaCampos',fiesta:'btnCelebracion',enlace:'enlaceCodigo enlaceGenerar enlaceCopiar enlaceEstado',inc:'incList btnIncLimpiar btnGuardarRuta guardarRutaDiag btnAutopista btnApZoom btnPrecarga btnSuave autopistaDiag btnBanco bancoDiag btnFluidez fluDiag',sis:'btnAA btnTestTramo tramoDiag evFila btnEVPlan evPlanTxt btnTestEV evDiag btnLimpiarFavs btnWake'};
+  const M={mapa:'btnEdificios btnHitos btnSenales btnPitch btnTrafico btnTraficoCalles btnModoMapa btnLuces btnCarriles btnAutoAncho btnAutoVista btnPasos btnPeajes btnTramos btnVerRadares radEdInfo btnRadReset btnSugerido btnFlechaMan btnFotosCarriles carrilDiag btnEstSol btnEstLuz btnEstVias btnEstRelieve btnBusqAmbito btnCamDenso btnFlechas btnPantCompleta',aspecto:'btnRelAgua btnRelVerde btnRelPuente btnAspBarrio btnAspVerde btnAspArboles btnAspAceras btnAspBorde btnAspMedir aspDiag btnBordes btnAspEstacion',cielo:'btnSky btnCielo btnTiempo',sonido:'btnAvisosRadares btnObras btnVoz btnVozVol',carg:'btnListaCargadores btnCargMapa btnCargAm btnCargAz btnCargVe cargDiag btnCargTe',park:'btnParkOn btnParkGra btnParkSub btnListaParking parkDiag',gps:'btnGpsMan btnGpsAuto',coche:'btnCoche filaColorCoche btnTiltCoche',futbol:'btnListaCampos',fiesta:'btnCelebracion',enlace:'enlaceCodigo enlaceGenerar enlaceCopiar enlaceEstado',inc:'incList btnIncLimpiar btnGuardarRuta guardarRutaDiag btnAutopista btnApZoom btnPrecarga btnSuave autopistaDiag btnBanco bancoDiag btnFluidez fluDiag',sis:'btnAA btnTestTramo tramoDiag evFila btnEVPlan evPlanTxt btnTestEV evDiag btnLimpiarFavs btnWake'};
   const POR={}; for(const c in M) M[c].split(' ').forEach(id=>POR[id]=c);
   const cuerpos={}, cats={};
   const ref=panel.querySelector('h2');
