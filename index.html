@@ -546,7 +546,7 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v242 · fotos de carriles en cualquier salida</div>
+  <div class="seccion">Versión v243 · carriles: aviso breve y fijo a menos de 2 km</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -2058,6 +2058,8 @@ function cuadrosDeStep(s,hw,tam,conCarriles){
 }
 /* v246: foto de carriles bajo los carteles de dirección (carpeta carriles/). Solo en autopista/autovía y solo si el esquema de carriles coincide con una foto;
    si no coincide no se muestra nada. Se carga la imagen solo cuando toca. Interruptor en Ajustes (ON por defecto) para apagarlo si pesa en el Tesla. */
+/* v250: carteles de carriles y foto: aviso de AVISO_CARR_MS al empezar la maniobra si está lejos, se ocultan, y quedan fijos desde LIM_CARR_M */
+const LIM_CARR_M = 2000, AVISO_CARR_MS = 8000; let __avisoCarr = {k:-1,t0:0};
 const FOTOS_CARRIL_ON = () => { try { return localStorage.getItem('fotos_carril_on') !== '0'; } catch(e) { return true; } };
 const FOTOS_CARRIL = {
   derecha:{ '2|1':'salida-1-de-2-derecha', '3|2':'salida-3-carriles-1-derecha', '3|1,2':'salida-2-de-3-derecha', '4|2,3':'salida-2-de-4-derecha-2-flechas' },
@@ -2112,14 +2114,16 @@ function renderStep(){
   const d=Math.max(0,(s.metro||0)-rec);
   if(window.__voz){ try{ __voz.paso(s,d,stepIdx); }catch(e){} }
   const s2=steps[stepIdx+1];
-  const hw=!!s.hw, hw2=!!(s2&&s2.hw), clave=stepIdx+'|'+hw+'|'+(s2?(hw2?2:1):0);
+  if(__avisoCarr.k!==stepIdx) __avisoCarr={k:stepIdx,t0:Date.now()};
+  const lejos=d>LIM_CARR_M&&(Date.now()-__avisoCarr.t0>AVISO_CARR_MS);
+  const hw=!!s.hw, hw2=!!(s2&&s2.hw), clave=stepIdx+'|'+hw+'|'+(s2?(hw2?2:1):0)+'|'+(lejos?'L':'C');
   if(clave!==ultimoStepPintado){
     ultimoStepPintado=clave;
-    const carr=!!(s.lanes&&s.lanes.length>=2&&!(s.maneuver&&(s.maneuver.type==='arrive'||s.maneuver.type==='roundabout'||s.maneuver.type==='rotary')));
+    const carr=!lejos&&!!(s.lanes&&s.lanes.length>=2&&!(s.maneuver&&(s.maneuver.type==='arrive'||s.maneuver.type==='roundabout'||s.maneuver.type==='rotary')));
     document.getElementById('navprincipal').classList.toggle('conCarriles',carr);
-    document.getElementById('navarrow').innerHTML=cuadrosDeStep(s,hw,carr?44:58,true);
+    document.getElementById('navarrow').innerHTML=cuadrosDeStep(s,hw,carr?44:58,!lejos);
     document.getElementById('navsub').textContent=nombreStep(s);
-    actualizarFotoCarril(s); try{ diagCarriles(s); }catch(e){}
+    actualizarFotoCarril(lejos?null:s); try{ diagCarriles(s); }catch(e){}
     document.getElementById('navsep').style.display=s2?'block':'none';
     document.getElementById('navFila2').style.display=s2?'flex':'none';
     if(s2){ document.getElementById('navarrow2').innerHTML=cuadrosDeStep(s2,hw2,40,false); document.getElementById('navsub2').textContent=nombreStep(s2); }
