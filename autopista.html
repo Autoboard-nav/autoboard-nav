@@ -505,6 +505,7 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
   <button class="ajuste" id="btnPeajes">🚫 Evitar peajes: OFF</button>
   <button class="ajuste on" id="btnTramos">📏 Radares de tramo (media): ON</button>
   <button class="ajuste on" id="btnSugerido">🕘 Destino sugerido: ON</button>
+  <button class="ajuste on" id="btnFotosCarriles">🖼️ Fotos de carriles bajo los carteles: ON</button>
   <button class="ajuste on" id="btnFlechaMan">➡️ Flecha de maniobra en la calzada: ON</button>
   <button class="ajuste on" id="btnEstSol">☀️ Sol real: ON</button>
   <button class="ajuste on" id="btnEstLuz">✨ Luz y volumen: ON</button>
@@ -552,7 +553,7 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v245 · AUTOPISTA (bordes marcados con color visible de noche)</div>
+  <div class="seccion">Versión v246 · AUTOPISTA (fotos de carriles bajo los carteles)</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -608,6 +609,7 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
 <div id="navbanner">
   <button id="btnPararRuta" title="Detener ruta"><svg class="xsvg" viewBox="0 0 12 12" width="1em" height="1em" aria-hidden="true"><path d="M2 2L10 10M10 2L2 10" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg></button>
   <div id="navprincipal"><div id="navarrow"></div><div class="nbTxt"><div id="navd">-</div><div id="navsub"></div></div></div>
+  <img id="fotoCarril" alt="" style="display:none;width:100%;max-height:150px;object-fit:cover;border-radius:12px" onerror="this.style.display='none'">
   <div id="navsep" style="display:none"></div>
   <div id="navFila2" style="display:none"><div id="navarrow2"></div><div class="nbTxt"><div id="navd2">-</div><div id="navsub2"></div></div></div>
 </div>
@@ -2066,6 +2068,29 @@ function cuadrosDeStep(s,hw,tam,conCarriles){
   }
   return cuadroNav('<svg viewBox="0 0 48 48">'+flechaGiroSVG(m.modifier,c)+'</svg>',hw,tam);
 }
+/* v246: foto de carriles bajo los carteles de dirección (carpeta carriles/). Solo en autopista/autovía y solo si el esquema de carriles coincide con una foto;
+   si no coincide no se muestra nada. Se carga la imagen solo cuando toca. Interruptor en Ajustes (ON por defecto) para apagarlo si pesa en el Tesla. */
+const FOTOS_CARRIL_ON = () => { try { return localStorage.getItem('fotos_carril_on') !== '0'; } catch(e) { return true; } };
+const FOTOS_CARRIL = {
+  derecha:{ '2|1':'salida-1-de-2-derecha', '3|2':'salida-3-carriles-1-derecha', '3|1,2':'salida-2-de-3-derecha', '4|2,3':'salida-2-de-4-derecha-2-flechas' },
+  izquierda:{ '2|0':'salida-1-de-2-izquierda', '3|0':'salida-3-carriles-1-izquierda', '3|0,1':'salida-2-de-3-izquierda', '4|0,1':'salida-2-de-4-izquierda-2-flechas' },
+  frente:{ '2|1':'frente-2-carriles-1-derecha', '2|0':'frente-2-carriles-1-izquierda', '3|2':'frente-3-carriles-1-derecha', '3|0':'frente-3-carriles-1-izquierda', '4|3':'frente-4-carriles-1-derecha', '4|0':'frente-4-carriles-1-izquierda' }
+};
+function fotoCarrilPara(s){
+  if(!s||!s.hw||!s.maneuver||s.maneuver.type!=='turn'||!Array.isArray(s.lanes)) return null;
+  const n=s.lanes.length, act=[]; s.lanes.forEach((l,i)=>{ if(l&&l.lane&&l.lane.active) act.push(i); });
+  if(n<2||n>4||!act.length||act.length===n) return null;
+  const mod=String(s.maneuver.modifier||'straight'), lado=/right/.test(mod)?'derecha':(/left/.test(mod)?'izquierda':'frente');
+  const f=(FOTOS_CARRIL[lado]||{})[n+'|'+act.join(',')];
+  return f?'carriles/'+f+'.jpg':null;
+}
+function actualizarFotoCarril(s){
+  const img=document.getElementById('fotoCarril'); if(!img) return;
+  let src=null; try{ src=FOTOS_CARRIL_ON()?fotoCarrilPara(s):null; }catch(e){}
+  if(!src){ img.style.display='none'; if(img.getAttribute('src')) img.removeAttribute('src'); return; }
+  if(img.getAttribute('src')!==src) img.setAttribute('src',src);
+  img.style.display='block';
+}
 function nombreStep(s){ return (s.maneuver&&s.maneuver.type==='arrive') ? (s.calle||'Destino') : (s.calle||s.msg||''); }
 function renderStep(){
   const s=steps[stepIdx];
@@ -2084,6 +2109,7 @@ function renderStep(){
     document.getElementById('navprincipal').classList.toggle('conCarriles',carr);
     document.getElementById('navarrow').innerHTML=cuadrosDeStep(s,hw,carr?44:58,true);
     document.getElementById('navsub').textContent=nombreStep(s);
+    actualizarFotoCarril(s);
     document.getElementById('navsep').style.display=s2?'block':'none';
     document.getElementById('navFila2').style.display=s2?'flex':'none';
     if(s2){ document.getElementById('navarrow2').innerHTML=cuadrosDeStep(s2,hw2,40,false); document.getElementById('navsub2').textContent=nombreStep(s2); }
@@ -5899,7 +5925,7 @@ window.__carg=(function(){
   document.head.appendChild(st);
 
   const CATS=[['mapa','🗺️ Mapa y vista'],['aspecto','🎨 Aspecto del mapa'],['cielo','🌦️ Cielo y tiempo'],['sonido','🔊 Sonido y avisos'],['carg','⚡ Cargadores'],['park','🅿️ Aparcamientos'],['gps','📍 GPS'],['coche','🚗 Coche'],['futbol','⚽ Fútbol'],['fiesta','🎉 Celebración'],['enlace','🔗 Enlace entre dispositivos'],['inc','⚠️ Incidencias'],['sis','⚙️ Rendimiento y versión']];
-  const M={mapa:'btnEdificios btnHitos btnSenales btnPitch btnTrafico btnTraficoCalles btnModoMapa btnLuces btnCarriles btnAutoAncho btnAutoVista btnPasos btnPeajes btnTramos btnSugerido btnFlechaMan btnEstSol btnEstLuz btnEstVias btnEstRelieve btnBusqAmbito btnCamDenso btnFlechas btnPantCompleta',aspecto:'btnRelAgua btnRelVerde btnRelPuente btnAspBarrio btnAspVerde btnAspArboles btnAspAceras btnAspBorde btnAspMedir aspDiag btnBordes btnAspEstacion',cielo:'btnSky btnCielo btnTiempo',sonido:'btnAvisosRadares btnObras btnVoz btnVozVol',carg:'btnListaCargadores btnCargMapa btnCargAm btnCargAz btnCargVe cargDiag btnCargTe',park:'btnParkOn btnParkGra btnParkSub btnListaParking parkDiag',gps:'btnGpsMan btnGpsAuto',coche:'btnCoche filaColorCoche btnTiltCoche',futbol:'btnListaCampos',fiesta:'btnCelebracion',enlace:'enlaceCodigo enlaceGenerar enlaceCopiar enlaceEstado',inc:'incList btnIncLimpiar btnGuardarRuta guardarRutaDiag btnAutopista btnApZoom btnPrecarga btnSuave autopistaDiag btnBanco bancoDiag btnFluidez fluDiag',sis:'btnAA btnTestTramo tramoDiag evFila btnEVPlan evPlanTxt btnTestEV evDiag btnLimpiarFavs btnWake'};
+  const M={mapa:'btnEdificios btnHitos btnSenales btnPitch btnTrafico btnTraficoCalles btnModoMapa btnLuces btnCarriles btnAutoAncho btnAutoVista btnPasos btnPeajes btnTramos btnSugerido btnFlechaMan btnFotosCarriles btnEstSol btnEstLuz btnEstVias btnEstRelieve btnBusqAmbito btnCamDenso btnFlechas btnPantCompleta',aspecto:'btnRelAgua btnRelVerde btnRelPuente btnAspBarrio btnAspVerde btnAspArboles btnAspAceras btnAspBorde btnAspMedir aspDiag btnBordes btnAspEstacion',cielo:'btnSky btnCielo btnTiempo',sonido:'btnAvisosRadares btnObras btnVoz btnVozVol',carg:'btnListaCargadores btnCargMapa btnCargAm btnCargAz btnCargVe cargDiag btnCargTe',park:'btnParkOn btnParkGra btnParkSub btnListaParking parkDiag',gps:'btnGpsMan btnGpsAuto',coche:'btnCoche filaColorCoche btnTiltCoche',futbol:'btnListaCampos',fiesta:'btnCelebracion',enlace:'enlaceCodigo enlaceGenerar enlaceCopiar enlaceEstado',inc:'incList btnIncLimpiar btnGuardarRuta guardarRutaDiag btnAutopista btnApZoom btnPrecarga btnSuave autopistaDiag btnBanco bancoDiag btnFluidez fluDiag',sis:'btnAA btnTestTramo tramoDiag evFila btnEVPlan evPlanTxt btnTestEV evDiag btnLimpiarFavs btnWake'};
   const POR={}; for(const c in M) M[c].split(' ').forEach(id=>POR[id]=c);
   const cuerpos={}, cats={};
   const ref=panel.querySelector('h2');
@@ -6784,6 +6810,10 @@ window.__flechaMan=(function(){
     }catch(e){}
   }
   setInterval(tick,250);
+    const bf=document.getElementById('btnFotosCarriles');
+  const tf=()=>{ const o=FOTOS_CARRIL_ON(); if(bf){ bf.textContent='🖼️ Fotos de carriles bajo los carteles: '+(o?'ON':'OFF'); bf.classList.toggle('on',o); } };
+  if(bf) bf.onclick=()=>{ try{ localStorage.setItem('fotos_carril_on', FOTOS_CARRIL_ON()?'0':'1'); }catch(e){} tf(); try{ actualizarFotoCarril(steps[stepIdx]); }catch(e){} };
+  tf();
   const b=document.getElementById('btnFlechaMan'); const t=()=>{ if(b){ b.textContent='➡️ Flecha de maniobra en la calzada: '+(on?'ON':'OFF'); b.classList.toggle('on',on); } };
   if(b) b.onclick=()=>{ on=!on; try{ localStorage.setItem('flecha_man_on',on?'1':'0'); }catch(e){} if(!on) vaciar(); t(); }; t();
   return { estado:()=>({on,creado,visible:ultVis,clave}), ring:flecha };
