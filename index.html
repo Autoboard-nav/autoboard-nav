@@ -506,6 +506,7 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
   <button class="ajuste on" id="btnTramos">📏 Radares de tramo (media): ON</button>
   <button class="ajuste on" id="btnSugerido">🕘 Destino sugerido: ON</button>
   <button class="ajuste on" id="btnFlechaMan">➡️ Flecha de maniobra en la calzada: ON</button>
+  <button class="ajuste" id="btnFotosCarriles">🖼️ Fotos de carriles bajo la maniobra: OFF</button>
   <button class="ajuste on" id="btnEstSol">☀️ Sol real: ON</button>
   <button class="ajuste on" id="btnEstLuz">✨ Luz y volumen: ON</button>
   <button class="ajuste on" id="btnEstVias">🛣️ Carreteras por jerarquía: ON</button>
@@ -601,6 +602,7 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
   <button id="btnPararRuta" title="Detener ruta"><svg class="xsvg" viewBox="0 0 12 12" width="1em" height="1em" aria-hidden="true"><path d="M2 2L10 10M10 2L2 10" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg></button>
   <div id="navprincipal"><div id="navarrow"></div><div class="nbTxt"><div id="navd">-</div><div id="navsub"></div></div></div>
   <div id="navsep" style="display:none"></div>
+  <img id="fotoCarril" alt="" style="display:none;width:100%;max-width:420px;border-radius:12px;margin-top:4px">
   <div id="navFila2" style="display:none"><div id="navarrow2"></div><div class="nbTxt"><div id="navd2">-</div><div id="navsub2"></div></div></div>
 </div>
 <div id="cartelAlt">
@@ -2054,6 +2056,42 @@ function cuadrosDeStep(s,hw,tam,conCarriles){
   return cuadroNav('<svg viewBox="0 0 48 48">'+flechaGiroSVG(m.modifier,c)+'</svg>',hw,tam);
 }
 function nombreStep(s){ return (s.maneuver&&s.maneuver.type==='arrive') ? (s.calle||'Destino') : (s.calle||s.msg||''); }
+/* Fotos de carriles (repositorio carriles/): solo si el interruptor de Ajustes está activo */
+const FOTOS_CARRIL_ON = () => { try { return localStorage.getItem('fotos_carril_on') === '1'; } catch(e) { return false; } };
+function fotoCarrilPara(s){
+  const D='carriles/';
+  if(!s||!s.maneuver||!Array.isArray(s.lanes)) return null;
+  const t=s.maneuver.type, mod=String(s.maneuver.modifier||'');
+  const side= /left/.test(mod) ? 'izquierda' : /right/.test(mod) ? 'derecha' : null;
+  const n=s.lanes.length, valid=s.lanes.map((l,i)=>(l&&l.valid?i:-1)).filter(i=>i>=0);
+  if(t==='merge'){
+    if(!side) return null;
+    if(n===3) return D+'incorporacion-3-desde-1-carril-'+side+'.jpg';
+    if(n===2) return D+'incorporacion-2-desde-1-carril-'+side+'.jpg';
+    return null;
+  }
+  if(t==='off ramp'||t==='fork'){
+    if(!side) return null;
+    if(n===2 && valid.length===1) return valid[0]===1&&side==='derecha' ? D+'salida-1-de-2-derecha.jpg' : valid[0]===0&&side==='izquierda' ? D+'salida-1-de-2-izquierda.jpg' : null;
+    if(n===3 && valid.length===1) return valid[0]===2&&side==='derecha' ? D+'salida-3-carriles-1-derecha.jpg' : valid[0]===0&&side==='izquierda' ? D+'salida-3-carriles-1-izquierda.jpg' : null;
+    if(n===3 && valid.length===2) return valid.includes(1)&&valid.includes(2)&&side==='derecha' ? D+'salida-2-de-3-derecha.jpg' : valid.includes(0)&&valid.includes(1)&&side==='izquierda' ? D+'salida-2-de-3-izquierda.jpg' : null;
+    if(n===4 && valid.length===2) return valid.includes(2)&&valid.includes(3)&&side==='derecha' ? D+'salida-2-de-4-derecha-2-flechas.jpg' : valid.includes(0)&&valid.includes(1)&&side==='izquierda' ? D+'salida-2-de-4-izquierda-2-flechas.jpg' : null;
+    return null;
+  }
+  if((t==='new name'||t==='continue'||t==='turn'||t==='notification')&&(!side||mod==='straight')&&valid.length===1){
+    if(n===2) return valid[0]===1 ? D+'frente-2-carriles-1-derecha.jpg' : valid[0]===0 ? D+'frente-2-carriles-1-izquierda.jpg' : null;
+    if(n===3) return valid[0]===2 ? D+'frente-3-carriles-1-derecha.jpg' : valid[0]===0 ? D+'frente-3-carriles-1-izquierda.jpg' : null;
+    if(n===4) return valid[0]===3 ? D+'frente-4-carriles-1-derecha.jpg' : valid[0]===0 ? D+'frente-4-carriles-1-izquierda.jpg' : null;
+  }
+  return null;
+}
+function actualizarFotoCarril(s){
+  const img=document.getElementById('fotoCarril'); if(!img) return;
+  const src=FOTOS_CARRIL_ON()?fotoCarrilPara(s):null;
+  if(!src){ img.style.display='none'; img.removeAttribute('src'); return; }
+  if(img.getAttribute('src')!==src) img.src=src;
+  img.style.display='block';
+}
 function renderStep(){
   const s=steps[stepIdx];
   if(!s||!steps.length){document.getElementById('navbanner').style.display='none';document.getElementById('btnPararRuta').classList.remove('on');return Infinity;}
@@ -2072,6 +2110,7 @@ function renderStep(){
     document.getElementById('navarrow').innerHTML=cuadrosDeStep(s,hw,carr?44:58,true);
     document.getElementById('navsub').textContent=nombreStep(s);
     document.getElementById('navsep').style.display=s2?'block':'none';
+    actualizarFotoCarril(s);
     document.getElementById('navFila2').style.display=s2?'flex':'none';
     if(s2){ document.getElementById('navarrow2').innerHTML=cuadrosDeStep(s2,hw2,40,false); document.getElementById('navsub2').textContent=nombreStep(s2); }
   }
@@ -6763,6 +6802,10 @@ window.__flechaMan=(function(){
     }catch(e){}
   }
   setInterval(tick,250);
+  const bf=document.getElementById('btnFotosCarriles');
+  const tf=()=>{ const on=FOTOS_CARRIL_ON(); if(bf){ bf.textContent='🖼️ Fotos de carriles bajo la maniobra: '+(on?'ON':'OFF'); bf.classList.toggle('on',on); } };
+  if(bf) bf.onclick=()=>{ try{ localStorage.setItem('fotos_carril_on', FOTOS_CARRIL_ON()?'0':'1'); }catch(e){} tf(); try{ actualizarFotoCarril(steps[stepIdx]); }catch(e){} };
+  tf();
   const b=document.getElementById('btnFlechaMan'); const t=()=>{ if(b){ b.textContent='➡️ Flecha de maniobra en la calzada: '+(on?'ON':'OFF'); b.classList.toggle('on',on); } };
   if(b) b.onclick=()=>{ on=!on; try{ localStorage.setItem('flecha_man_on',on?'1':'0'); }catch(e){} if(!on) vaciar(); t(); }; t();
   return { estado:()=>({on,creado,visible:ultVis,clave}), ring:flecha };
