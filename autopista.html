@@ -506,6 +506,7 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
   <button class="ajuste on" id="btnTramos">📏 Radares de tramo (media): ON</button>
   <button class="ajuste on" id="btnSugerido">🕘 Destino sugerido: ON</button>
   <button class="ajuste on" id="btnFotosCarriles">🖼️ Fotos de carriles bajo los carteles: ON</button>
+  <div id="carrilDiag" style="font-size:11px;opacity:.8;padding:2px 14px;white-space:pre-wrap;word-break:break-word;user-select:text">Diag carriles: haz una ruta y vuelve aquí.</div>
   <button class="ajuste on" id="btnFlechaMan">➡️ Flecha de maniobra en la calzada: ON</button>
   <button class="ajuste on" id="btnEstSol">☀️ Sol real: ON</button>
   <button class="ajuste on" id="btnEstLuz">✨ Luz y volumen: ON</button>
@@ -553,7 +554,7 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v246 · AUTOPISTA (fotos de carriles bajo los carteles)</div>
+  <div class="seccion">Versión v247 · AUTOPISTA (fotos de carriles + diag carriles)</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -1563,7 +1564,7 @@ async function iniciarSimulacionInt(preset){
       const metroFinal = porIndice!==null&&(off==null||Math.abs(porIndice-off)<=Math.max(300,off*.1))?porIndice:(off||0);
       const limiteKmh=(typeof it.speedLimitInKilometersPerHour==='number')?it.speedLimitInKilometersPerHour:0;
       const lanes=Array.isArray(it.lanes)?it.lanes:[];
-      return {metro:metroFinal,calle:it.street||'',msg:it.message||'',maneuver:ttMan(it),
+      return {metro:metroFinal,calle:it.street||'',msg:it.message||'',ins:String(it.maneuver||it.instructionType||''),maneuver:ttMan(it),
               hw:/autopista|autov[ií]a|\b(a|ap)-?\d/i.test(it.street||''),limiteKmh:limiteKmh,lanes:lanes};
     });
     if(preset && preset.fake){   /* prueba de zoom: maniobras ficticias cada 1,5 km sobre la misma ruta (giro, mantente, rotonda, giro) */
@@ -2091,6 +2092,27 @@ function actualizarFotoCarril(s){
   if(img.getAttribute('src')!==src) img.setAttribute('src',src);
   img.style.display='block';
 }
+/* v247 (diagnóstico): qué instrucción de TomTom y qué carriles hay en cada maniobra, para decidir si se pueden usar las fotos de incorporación */
+function __crudoCarriles(ruta,pi){
+  try{
+    const secs=((ruta&&ruta.sections)||[]).filter(x=>String(x.sectionType||'').toUpperCase()==='LANES'&&Array.isArray(x.lanes));
+    if(!secs.length||!Number.isInteger(pi)) return '';
+    let best=null,bd=1e9; for(const sc of secs){ const a=sc.startPointIndex||0,b=Number.isInteger(sc.endPointIndex)?sc.endPointIndex:a; const d=(pi>=a&&pi<=b)?0:(pi<a?a-pi:pi-b); if(d<bd){ bd=d; best=sc; } }
+    if(!best||bd>40) return '';
+    return best.lanes.length+' carriles a '+bd+' pts ['+best.lanes.map(l=>(l.directions||[]).join('+')+(l.follow?'*':'')).join(' | ')+']';
+  }catch(e){ return ''; }
+}
+const __diagCarr=[];
+function diagCarriles(s){
+  const el=document.getElementById('carrilDiag'); if(!el||!s) return;
+  const act=(s.lanes||[]).map((l,i)=>(l&&l.lane&&l.lane.active)?i:-1).filter(i=>i>=0);
+  let foto=''; try{ foto=(fotoCarrilPara(s)||'').replace('carriles/','').replace('.jpg',''); }catch(e){}
+  const linea='#'+stepIdx+' '+(s.ins||'?')+' · '+((s.maneuver&&s.maneuver.type)||'?')+' '+((s.maneuver&&s.maneuver.modifier)||'')+(s.hw?' · autopista':' · ciudad')
+    +' · app: '+((s.lanes||[]).length?(s.lanes.length+' carriles, activos '+act.join(',')):'sin carriles')+' · TomTom: '+(s.crudo||'sin carriles')+' · foto: '+(foto||'ninguna');
+  if(__diagCarr[0]&&__diagCarr[0].k===stepIdx) return;
+  __diagCarr.unshift({k:stepIdx,t:linea}); if(__diagCarr.length>8) __diagCarr.pop();
+  el.textContent=__diagCarr.map(x=>x.t).join('\n');
+}
 function nombreStep(s){ return (s.maneuver&&s.maneuver.type==='arrive') ? (s.calle||'Destino') : (s.calle||s.msg||''); }
 function renderStep(){
   const s=steps[stepIdx];
@@ -2109,7 +2131,7 @@ function renderStep(){
     document.getElementById('navprincipal').classList.toggle('conCarriles',carr);
     document.getElementById('navarrow').innerHTML=cuadrosDeStep(s,hw,carr?44:58,true);
     document.getElementById('navsub').textContent=nombreStep(s);
-    actualizarFotoCarril(s);
+    actualizarFotoCarril(s); try{ diagCarriles(s); }catch(e){}
     document.getElementById('navsep').style.display=s2?'block':'none';
     document.getElementById('navFila2').style.display=s2?'flex':'none';
     if(s2){ document.getElementById('navarrow2').innerHTML=cuadrosDeStep(s2,hw2,40,false); document.getElementById('navsub2').textContent=nombreStep(s2); }
@@ -2213,7 +2235,7 @@ async function calcularRuta(origen,destino,modo='normal',rutaPre=null){
       const metroFinal=porIndice!==null&&(off==null||Math.abs(porIndice-off)<=Math.max(300,off*.1))?porIndice:(off||0);
       const limiteKmh=(typeof it.speedLimitInKilometersPerHour==='number')?it.speedLimitInKilometersPerHour:0;
       const man=ttMan(it); let lanes=Array.isArray(it.lanes)?it.lanes:[]; if(!lanes.length){ try{ lanes=__lanesFn(pi,man); }catch(e){ lanes=[]; } }
-      return {metro:metroFinal,calle:it.street||'',msg:it.message||'',maneuver:man,hw:/autopista|autov[ií]a|\b(a|ap)-?\d/i.test(it.street||''),limiteKmh:limiteKmh,lanes:lanes};
+      return {metro:metroFinal,calle:it.street||'',msg:it.message||'',ins:String(it.maneuver||it.instructionType||''),crudo:__crudoCarriles(ruta,pi),maneuver:man,hw:/autopista|autov[ií]a|\b(a|ap)-?\d/i.test(it.street||''),limiteKmh:limiteKmh,lanes:lanes};
     });
     stepIdx=0;routeProgIdx=0;ultimoStepPintado='';__divCount=0;
     if(modo==='recalculo'){ const t=performance.now(); recalcSeguidos=(t-rutaNuevaT<25000)?recalcSeguidos+1:1; rutaNuevaT=t; }
@@ -5925,7 +5947,7 @@ window.__carg=(function(){
   document.head.appendChild(st);
 
   const CATS=[['mapa','🗺️ Mapa y vista'],['aspecto','🎨 Aspecto del mapa'],['cielo','🌦️ Cielo y tiempo'],['sonido','🔊 Sonido y avisos'],['carg','⚡ Cargadores'],['park','🅿️ Aparcamientos'],['gps','📍 GPS'],['coche','🚗 Coche'],['futbol','⚽ Fútbol'],['fiesta','🎉 Celebración'],['enlace','🔗 Enlace entre dispositivos'],['inc','⚠️ Incidencias'],['sis','⚙️ Rendimiento y versión']];
-  const M={mapa:'btnEdificios btnHitos btnSenales btnPitch btnTrafico btnTraficoCalles btnModoMapa btnLuces btnCarriles btnAutoAncho btnAutoVista btnPasos btnPeajes btnTramos btnSugerido btnFlechaMan btnFotosCarriles btnEstSol btnEstLuz btnEstVias btnEstRelieve btnBusqAmbito btnCamDenso btnFlechas btnPantCompleta',aspecto:'btnRelAgua btnRelVerde btnRelPuente btnAspBarrio btnAspVerde btnAspArboles btnAspAceras btnAspBorde btnAspMedir aspDiag btnBordes btnAspEstacion',cielo:'btnSky btnCielo btnTiempo',sonido:'btnAvisosRadares btnObras btnVoz btnVozVol',carg:'btnListaCargadores btnCargMapa btnCargAm btnCargAz btnCargVe cargDiag btnCargTe',park:'btnParkOn btnParkGra btnParkSub btnListaParking parkDiag',gps:'btnGpsMan btnGpsAuto',coche:'btnCoche filaColorCoche btnTiltCoche',futbol:'btnListaCampos',fiesta:'btnCelebracion',enlace:'enlaceCodigo enlaceGenerar enlaceCopiar enlaceEstado',inc:'incList btnIncLimpiar btnGuardarRuta guardarRutaDiag btnAutopista btnApZoom btnPrecarga btnSuave autopistaDiag btnBanco bancoDiag btnFluidez fluDiag',sis:'btnAA btnTestTramo tramoDiag evFila btnEVPlan evPlanTxt btnTestEV evDiag btnLimpiarFavs btnWake'};
+  const M={mapa:'btnEdificios btnHitos btnSenales btnPitch btnTrafico btnTraficoCalles btnModoMapa btnLuces btnCarriles btnAutoAncho btnAutoVista btnPasos btnPeajes btnTramos btnSugerido btnFlechaMan btnFotosCarriles carrilDiag btnEstSol btnEstLuz btnEstVias btnEstRelieve btnBusqAmbito btnCamDenso btnFlechas btnPantCompleta',aspecto:'btnRelAgua btnRelVerde btnRelPuente btnAspBarrio btnAspVerde btnAspArboles btnAspAceras btnAspBorde btnAspMedir aspDiag btnBordes btnAspEstacion',cielo:'btnSky btnCielo btnTiempo',sonido:'btnAvisosRadares btnObras btnVoz btnVozVol',carg:'btnListaCargadores btnCargMapa btnCargAm btnCargAz btnCargVe cargDiag btnCargTe',park:'btnParkOn btnParkGra btnParkSub btnListaParking parkDiag',gps:'btnGpsMan btnGpsAuto',coche:'btnCoche filaColorCoche btnTiltCoche',futbol:'btnListaCampos',fiesta:'btnCelebracion',enlace:'enlaceCodigo enlaceGenerar enlaceCopiar enlaceEstado',inc:'incList btnIncLimpiar btnGuardarRuta guardarRutaDiag btnAutopista btnApZoom btnPrecarga btnSuave autopistaDiag btnBanco bancoDiag btnFluidez fluDiag',sis:'btnAA btnTestTramo tramoDiag evFila btnEVPlan evPlanTxt btnTestEV evDiag btnLimpiarFavs btnWake'};
   const POR={}; for(const c in M) M[c].split(' ').forEach(id=>POR[id]=c);
   const cuerpos={}, cats={};
   const ref=panel.querySelector('h2');
