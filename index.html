@@ -2062,6 +2062,7 @@ function fotoCarrilPara(s){
   const D='carriles/';
   if(!s||!s.maneuver||!Array.isArray(s.lanes)) return null;
   const t=s.maneuver.type, mod=String(s.maneuver.modifier||'');
+  if(/roundabout|rotary/.test(t)||s.maneuver.exit!=null) return null; // las rotondas no llevan foto de carriles
   const side= /left/.test(mod) ? 'izquierda' : /right/.test(mod) ? 'derecha' : null;
   const n=s.lanes.length, valid=s.lanes.map((l,i)=>(l&&l.valid?i:-1)).filter(i=>i>=0);
   if(t==='merge'){
