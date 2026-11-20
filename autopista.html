@@ -554,7 +554,7 @@ body.noche #listaCargadores .cargadorItem .titulo{color:#e8edf2}
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v248 · AUTOPISTA (fotos de carriles: 2 carriles azules en 4 y 5 carriles)</div>
+  <div class="seccion">Versión v249 · AUTOPISTA (fotos de carriles en cualquier salida)</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -2079,7 +2079,7 @@ const FOTOS_CARRIL = {
     '4|2,3':'ia-azul-derecha-2-carriles', '4|0,1':'ia-azul-izquierda-2-carriles', '5|3,4':'caso05-incorporacion-3-carriles-derecha', '5|0,1':'caso05-incorporacion-3-carriles-izquierda' }
 };
 function fotoCarrilPara(s){
-  if(!s||!s.hw||!s.maneuver||s.maneuver.type!=='turn'||!Array.isArray(s.lanes)) return null;
+  if(!s||!s.maneuver||s.maneuver.type!=='turn'||!Array.isArray(s.lanes)) return null;
   const n=s.lanes.length, act=[]; s.lanes.forEach((l,i)=>{ if(l&&l.lane&&l.lane.active) act.push(i); });
   if(n<2||n>5||!act.length||act.length===n) return null;
   const mod=String(s.maneuver.modifier||'straight'), lado=/right/.test(mod)?'derecha':(/left/.test(mod)?'izquierda':'frente');
