@@ -583,7 +583,7 @@ body.noche #radEd .chip{background:#2d353d;border-color:#3a434c;color:#e8edf2} b
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v253 · AUTOPISTA (botones de búsqueda editables)</div>
+  <div class="seccion">Versión v254 · AUTOPISTA (ruta habitual)</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -2575,6 +2575,7 @@ function onFix(pos){
   }
 
   lastFix=now;
+  habRegistrar(now.lat,now.lon);
   if(steps.length){
     const ll=[now.lat,now.lon];
     actualizarRouteProgIdx(ll);
@@ -2583,7 +2584,7 @@ function onFix(pos){
     const d=renderStep();
     { const t=performance.now(); if(t-Math.max(__trimT,__trimFixT)>350){ __trimFixT=t; actualizarTrimRuta(); } }   /* v220: el bucle de cámara ya recorta el azul; aquí solo si lleva >350 ms sin hacerlo */
     const s=steps[stepIdx];
-    if(s && s.maneuver && s.maneuver.type==='arrive' && d<50){ dispararCelebracion(); }
+    if(s && s.maneuver && s.maneuver.type==='arrive' && d<50){ habAprender(); dispararCelebracion(); }
     /* El zoom de maniobra ya no se decide aquí (un solo umbral binario a 180 m, sin histéresis):
        lo gobierna actualizarManiobra() cada frame, con la distancia extrapolada. */
     const limRuta=limiteEnRuta(recorrido);
@@ -3241,6 +3242,7 @@ async function navegarA(lat,lon,nombre,origen){
   ultimoRecalculo=performance.now(); ultimoCambioTrafico=performance.now();
   const ok=await calcularRuta([lastFix.lat,lastFix.lon],[lat,lon],'normal');
   if(!ok){ ultimaRutaDestino=null; return false; }
+  try{ habIniciar([lastFix.lat,lastFix.lon],[lat,lon],routeCoordsLL); }catch(e){}
   document.body.classList.add('modo-navegacion');
   const av=document.getElementById('avisoInicial'); if(av) av.classList.add('oculto');
   seguirOn=true; const btnSeg=document.getElementById('btnSeguir'); if(btnSeg) btnSeg.classList.add('activo');
@@ -3770,7 +3772,89 @@ function limpiarAlternativas(){
 }
 function pintarAltEnMapa(){
   const s=map.getSource('ruta-alt'); if(!s) return;
-  s.setData({type:'FeatureCollection',features:alts.map((a,i)=>({type:'Feature',geometry:{type:'LineString',coordinates:a.coords},properties:{c:ALT.COLORES[i%ALT.COLORES.length],sel:i===altSel?1:0}}))});
+  s.setData({type:'FeatureCollection',features:alts.map((a,i)=>({type:'Feature',geometry:{type:'LineString',coordinates:a.coords},properties:{c:(a.hab?'#f2b01e':ALT.COLORES[i%ALT.COLORES.length]),sel:i===altSel?1:0}}))});
+}
+
+/* ---- Ruta habitual: graba por dónde conduces de verdad y, tras repetirla, la ofrece en el panel de rutas ----
+   Al llegar se compara el recorrido REAL con la ruta que se calculó al salir. Si te saliste de ella ≥150 m durante ≥600 m,
+   se guardan 1-4 puntos de paso (solo en este navegador, localStorage 'rutas_hab'). Con 2 repeticiones parecidas del mismo
+   origen→destino aparece «⭐ Tu ruta habitual» en el panel. Nunca se activa sola. Solo cuenta conducción real (no simulación). */
+const HAB={ MIN_TRAMO_M:600, LEJOS_M:150, PASO_M:60, MIN_M:1500, MAX_VIAS:4, IGUAL_M:500, VECES:2, MAX_ENT:60, MAX_VAR:3, CASA_O_M:400, CASA_D_M:300 };
+let __plan=null, __track=[], __habHecho=false;
+function habLeer(){ try{ const a=JSON.parse(localStorage.getItem('rutas_hab')||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function habGuardar(a){ try{ localStorage.setItem('rutas_hab',JSON.stringify(a)); }catch(e){} }
+function habIniciar(o,d,coords){ __plan={o:o,d:d,coords:coords.slice()}; __track=[]; __habHecho=false; }
+function habRegistrar(lat,lon){
+  if(!__plan||simulando||__track.length>=6000) return;
+  const p=[lat,lon], l=__track[__track.length-1];
+  if(!l||dist(l,p)>=HAB.PASO_M) __track.push(p);
+}
+function habIgual(a,b){
+  const cerca=(p,L)=>L.some(q=>dist(p,q)<HAB.IGUAL_M);
+  return a.length&&b.length&&a.every(p=>cerca(p,b))&&b.every(p=>cerca(p,a));
+}
+function habMismoPar(x,o,d){ return dist(x.o,o)<HAB.CASA_O_M && dist(x.d,d)<HAB.CASA_D_M; }
+function habAprender(){
+  if(!__plan||__habHecho||simulando) return;
+  __habHecho=true;
+  try{
+    const T=__track; if(T.length<10) return;
+    const cum=[0]; for(let i=1;i<T.length;i++) cum.push(cum[i-1]+dist(T[i-1],T[i]));
+    if(cum[cum.length-1]<HAB.MIN_M) return;
+    const P=__plan.coords, mx=111320*Math.cos(T[0][0]*Math.PI/180), my=110540, L=HAB.LEJOS_M;
+    const px=P.map(p=>p[1]*mx), py=P.map(p=>p[0]*my);
+    const off=T.map(t=>{
+      const x=t[1]*mx, y=t[0]*my;
+      for(let i=0;i<P.length-1;i++){
+        const ax=px[i],ay=py[i],bx=px[i+1],by=py[i+1];
+        if(x<Math.min(ax,bx)-L||x>Math.max(ax,bx)+L||y<Math.min(ay,by)-L||y>Math.max(ay,by)+L) continue;
+        const dx=bx-ax,dy=by-ay,L2=dx*dx+dy*dy; let u=L2?((x-ax)*dx+(y-ay)*dy)/L2:0; u=u<0?0:(u>1?1:u);
+        const ex=ax+u*dx-x, ey=ay+u*dy-y;
+        if(Math.sqrt(ex*ex+ey*ey)<=L) return false;
+      }
+      return true;
+    });
+    const runs=[]; let ini=-1, ult=-1, sin=0;
+    for(let i=0;i<T.length;i++){
+      if(off[i]){ if(ini<0) ini=i; ult=i; sin=0; }
+      else if(ini>=0 && ++sin>=3){ runs.push([ini,ult]); ini=-1; sin=0; }
+    }
+    if(ini>=0) runs.push([ini,ult]);
+    const largos=runs.filter(r=>cum[r[1]]-cum[r[0]]>=HAB.MIN_TRAMO_M);
+    if(!largos.length) return;
+    let via=[];
+    largos.forEach(r=>{
+      const len=cum[r[1]]-cum[r[0]];
+      (len>6000?[1/3,2/3]:[0.5]).forEach(f=>{ const m=cum[r[0]]+len*f; let k=r[0]; while(k<r[1]&&cum[k]<m) k++; via.push({i:k,p:T[k]}); });
+    });
+    via.sort((a,b)=>a.i-b.i);
+    if(via.length>HAB.MAX_VIAS){ const n=via.length, s=[]; for(let k=0;k<HAB.MAX_VIAS;k++) s.push(via[Math.round(k*(n-1)/(HAB.MAX_VIAS-1))]); via=s; }
+    const vp=via.map(v=>[+v.p[0].toFixed(5),+v.p[1].toFixed(5)]);
+    const O=__plan.o, D=__plan.d; let lista=habLeer();
+    let e=lista.find(x=>habMismoPar(x,O,D)&&habIgual(x.via,vp));
+    if(e){ e.n++; e.u=Date.now(); }
+    else{
+      e={o:[+O[0].toFixed(5),+O[1].toFixed(5)],d:[+D[0].toFixed(5),+D[1].toFixed(5)],via:vp,n:1,u:Date.now()};
+      lista.push(e);
+      const par=lista.filter(x=>habMismoPar(x,O,D)).sort((a,b)=>b.n-a.n||b.u-a.u);
+      if(par.length>HAB.MAX_VAR){ const fuera=new Set(par.slice(HAB.MAX_VAR)); lista=lista.filter(x=>!fuera.has(x)); }
+    }
+    lista.sort((a,b)=>b.u-a.u); habGuardar(lista.slice(0,HAB.MAX_ENT));
+    try{ avisoEnvio(e.n>=HAB.VECES?'⭐ Ruta habitual aprendida':'Ruta distinta guardada ('+e.n+'/'+HAB.VECES+')'); }catch(_){}
+  }catch(err){ try{ registrarError('hab',err.message); }catch(_){} }
+}
+function habMejor(){
+  if(!__plan) return null;
+  const c=habLeer().filter(x=>x.n>=HAB.VECES&&habMismoPar(x,__plan.o,__plan.d)).sort((a,b)=>b.n-a.n||b.u-a.u);
+  return c[0]||null;
+}
+function habViasPendientes(e){
+  const T=__track, lim=Math.max(0,T.length-8);
+  return e.via.filter(v=>{ for(let i=0;i<lim;i++) if(dist(T[i],v)<250) return false; return true; });
+}
+function habOlvidar(e){
+  const k=JSON.stringify([e.o,e.d,e.via]);
+  habGuardar(habLeer().filter(x=>JSON.stringify([x.o,x.d,x.via])!==k));
 }
 function etiquetaTrafico(delayS){ return delayS<60 ? '🟢 fluido' : (delayS<240 ? '🟠 algo de retención' : '🔴 atasco'); }
 /* Metro (desde el coche, por la alternativa) en el que deja de coincidir con la ruta actual */
@@ -3810,9 +3894,24 @@ async function buscarAlternativas(){
       return { R:R, s:R.summary.travelTimeInSeconds, m:R.summary.lengthInMeters, delay:R.summary.trafficDelayInSeconds||0,
                coords:pts.map(p=>[p[1],p[0]]), sep:metroDeSeparacion(pts) };
     });
+    try{
+      const hb=habMejor();
+      if(hb){
+        const vp=habViasPendientes(hb);
+        if(vp.length){
+          const jH=await fetch(urlRutaPorPuntos([o].concat(vp,[d]))).then(r=>r.json());
+          const H=jH.routes&&jH.routes[0];
+          if(H&&H.legs&&H.legs.length&&rutaDifiereDeLaActual(H)){
+            const pts=H.legs.flatMap(l=>l.points.map(q=>[q.latitude,q.longitude]));
+            alts.unshift({ R:H, s:H.summary.travelTimeInSeconds, m:H.summary.lengthInMeters, delay:H.summary.trafficDelayInSeconds||0,
+                           coords:pts.map(p=>[p[1],p[0]]), sep:metroDeSeparacion(pts), hab:true, vias:vp, ref:hb });
+          }
+        }
+      }
+    }catch(e){ registrarError('hab-alt',e.message); }
     altSel=-1;
-    altAlerta = !!(altActual && alts.some(a=>altActual.s-a.s>=ALT.AHORRO_AZUL_S));
-    const mejor=alts.slice().sort((x,y)=>x.s-y.s)[0];
+    altAlerta = !!(altActual && alts.some(a=>!a.hab&&altActual.s-a.s>=ALT.AHORRO_AZUL_S));
+    const mejor=alts.filter(a=>!a.hab).sort((x,y)=>x.s-y.s)[0];
     if(mejor && altActual && altActual.exacto) ofrecerAlternativa(mejor, altActual.s);
     pintarAltEnMapa(); actualizarBarraRuta(); if(altAbierto) pintarPanelAlt();
     return true;
@@ -3833,10 +3932,10 @@ function pintarPanelAlt(error){
     alts.forEach((a,i)=>{
       const dS=altActual?a.s-altActual.s:0;
       const dl = Math.abs(dS)<30 ? '<span class="dl">igual</span>' : (dS<0 ? '<span class="dl menos">−'+fmtMin(-dS)+'</span>' : '<span class="dl mas">+'+fmtMin(dS)+'</span>');
-      h+='<div class="alt'+(i===altSel?' sel':'')+'" data-i="'+i+'"><span class="pt" style="background:'+ALT.COLORES[i%ALT.COLORES.length]+'"></span><span class="t">'+fmtMin(a.s)+'</span>'+dl
-        +'<span class="e">'+fmtKm(a.m)+' · llegas '+fmtHora(Date.now()+a.s*1000)+' · '+etiquetaTrafico(a.delay)+(a.sep!==null?' · se separa en '+fmtKm(a.sep):'')+'</span></div>';
+      h+='<div class="alt'+(i===altSel?' sel':'')+'" data-i="'+i+'"><span class="pt" style="background:'+(a.hab?'#f2b01e':ALT.COLORES[i%ALT.COLORES.length])+'"></span><span class="t">'+(a.hab?'⭐ Tu ruta habitual':fmtMin(a.s))+'</span>'+dl
+        +'<span class="e">'+(a.hab?fmtMin(a.s)+' · hecha '+a.ref.n+' veces · ':'')+fmtKm(a.m)+' · llegas '+fmtHora(Date.now()+a.s*1000)+' · '+etiquetaTrafico(a.delay)+(a.sep!==null?' · se separa en '+fmtKm(a.sep):'')+'</span></div>';
     });
-    if(altSel>=0) h+='<div class="acc"><button id="altVolver">Mantener la actual</button><button class="ir" id="altIr">Ir por esta ruta</button></div>';
+    if(altSel>=0) h+='<div class="acc"><button id="altVolver">Mantener la actual</button>'+(alts[altSel]&&alts[altSel].hab?'<button id="altOlvidar">Olvidar</button>':'')+'<button class="ir" id="altIr">Ir por esta ruta</button></div>';
   }
   p.innerHTML=h;
 }
@@ -3859,6 +3958,7 @@ $id('panelAlt').onclick=(ev)=>{
   if(t.closest('#altCerrar')){ cerrarPanelAlt(); return; }
   if(t.closest('#altVolver')){ altSel=-1; pintarAltEnMapa(); pintarPanelAlt(); return; }
   if(t.closest('#altIr')){ irPorAlternativa(altSel); return; }
+  if(t.closest('#altOlvidar')){ const a=alts[altSel]; if(a&&a.hab){ habOlvidar(a.ref); alts.splice(altSel,1); altSel=-1; pintarAltEnMapa(); pintarPanelAlt(); } return; }
   const row=t.closest('.alt[data-i]');
   if(row){ altSel=+row.dataset.i; pintarAltEnMapa(); pintarPanelAlt(); }
 };
@@ -3909,12 +4009,17 @@ async function tomarAlternativa(a){
   ultimoRecalculo=performance.now(); ultimoCambioTrafico=ultimoRecalculo;
   let R=null;
   try{
+    if(a.hab&&a.vias){
+      const j=await fetch(urlRutaPorPuntos([o].concat(a.vias,[d]))+'&instructionsType=text&language=es-ES').then(r=>r.json());
+      if(j.routes&&j.routes[0]&&j.routes[0].guidance) R=j.routes[0];
+    } else {
     const pts=a.coords.map(c=>[c[1],c[0]]); let acum=0, sig=(a.sep||0)+250; const via=[o], total=pts.reduce((s,p,i)=>i?s+dist(pts[i-1],p):0,0);
     for(let i=1;i<pts.length && via.length<=TRAFICO.MAX_VIAS;i++){ acum+=dist(pts[i-1],pts[i]); if(acum>=sig && acum<total-300){ via.push(pts[i]); sig=acum+TRAFICO.VIA_CADA_M; } }
     if(via.length>1){
       via.push(d);
       const j=await fetch(urlRutaPorPuntos(via)+'&instructionsType=text&language=es-ES').then(r=>r.json());
       if(j.routes&&j.routes[0]&&j.routes[0].guidance) R=j.routes[0];
+    }
     }
   }catch(e){ registrarError('tomar-alt',e.message); }
   return await calcularRuta(o,d,'manual',R||a.R);
@@ -3949,6 +4054,7 @@ function detenerRuta(){
   if(window.__voz){ try{ __voz.parar(); }catch(e){} }
   steps=[];stepIdx=0;routeCoordsLL=[];routeCumDist=[];routeProgIdx=0;
   ultimaRutaDestino=null;destinoNombre='';limiteVelocidadVia=0;routeLimites=[];ultimoStepPintado='';
+  __plan=null; __track=[];
   resetCamRuta();
   routeNivelesPorPunto=[];
   const srcRuta=map.getSource('ruta');if(srcRuta) srcRuta.setData({type:'FeatureCollection',features:[]});
