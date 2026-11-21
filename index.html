@@ -106,6 +106,12 @@ body.noche #panelObras #obrasX{background:#343c45;color:#9aa5b1}
 #catChips{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px 6px}
 #catChips .catChip{border:0;border-radius:18px;padding:9px 13px;background:#eef1f4;color:#2f373f;font:700 14px system-ui,sans-serif;cursor:pointer}
 body.noche #catChips .catChip{background:#2d353d;color:#e8edf2}
+#catChips .catForm{display:flex;flex-direction:column;gap:7px;width:100%}
+#catChips .catForm input{border:2px solid #cfd5dc;border-radius:10px;padding:10px 12px;font:15px system-ui,sans-serif;background:#fff;color:#222}
+#catChips .del{background:#fde7e7!important;color:#b71c1c!important}
+body.noche #catChips .catForm input{background:#2d353d;border-color:#3a434c;color:#e8edf2}
+body.noche #catChips .del{background:#4a2a2a!important;color:#ffb4b4!important}
+
 #sugerencias .sug:last-child{border-bottom:0}
 #sugerencias .sug:hover{background:#f1f4f7}
 #sugerencias .sug .sub{color:#6b7580;font-size:12px;margin-top:2px}
@@ -569,7 +575,7 @@ body.noche #radEd .chip{background:#2d353d;border-color:#3a434c;color:#e8edf2} b
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v245 · búsqueda por lugares</div>
+  <div class="seccion">Versión v246 · botones de búsqueda editables</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -1922,11 +1928,40 @@ function filaBusqueda(s,i){
     +'<button class="favBtn" data-idx="'+i+'" title="Guardar en favoritos" style="background:transparent;border:0;color:'+(yaFav?'#ffd166':'#8d99a5')+';font-size:22px;cursor:pointer;padding:6px 10px;flex:0 0 auto">'+(yaFav?'★':'☆')+'</button>'
     +'</div>';
 }
+function catsLeer(){ try{ const a=JSON.parse(localStorage.getItem('cats_busq')||'null'); if(Array.isArray(a)) return a.filter(x=>Array.isArray(x)&&x[0]&&x[1]); }catch(e){} return CATS_BUSQ.map(x=>x.slice()); }
+function catsGuardar(a){ try{ localStorage.setItem('cats_busq',JSON.stringify(a)); }catch(e){} }
+let __catEdit=false, __catForm=false;
 function chipsCategoriaBusqueda(){
   const old=document.getElementById('catChips'); if(old) old.remove();
   const d=document.createElement('div'); d.id='catChips';
-  d.innerHTML=CATS_BUSQ.map(c=>'<button class="catChip" data-q="'+c[1]+'">'+c[0]+'</button>').join('');
-  d.onclick=ev=>{ const b=ev.target.closest('.catChip'); if(b) buscarCategoriaCerca(b.dataset.q,b.textContent); };
+  const cats=catsLeer();
+  if(__catForm){
+    d.innerHTML='<div class="catForm"><input id="catNom" placeholder="Emoji y nombre, ej: 🍕 Pizzerías" maxlength="24"><input id="catQ" placeholder="Qué buscar, ej: pizzería" maxlength="40">'
+      +'<button class="catChip" data-a="gua2" style="background:#1e9e4a;color:#fff">Guardar</button><button class="catChip" data-a="no">Cancelar</button></div>';
+  } else if(__catEdit){
+    d.innerHTML=cats.map((c,i)=>'<button class="catChip del" data-i="'+i+'">'+escapeHTML(c[0])+' ✕</button>').join('')
+      +(cats.length<16?'<button class="catChip" data-a="add" style="background:#1565c0;color:#fff">➕ Añadir</button>':'')
+      +'<button class="catChip" data-a="rst">↩️ Originales</button><button class="catChip" data-a="ok" style="background:#1e9e4a;color:#fff">✔ Listo</button>';
+  } else {
+    d.innerHTML=cats.map(c=>'<button class="catChip" data-q="'+escapeHTML(c[1])+'">'+escapeHTML(c[0])+'</button>').join('')+'<button class="catChip" data-a="ed" title="Editar botones">✏️</button>';
+  }
+  d.onclick=ev=>{
+    const b=ev.target.closest('.catChip'); if(!b) return;
+    const a=b.dataset.a;
+    if(b.dataset.q){ buscarCategoriaCerca(b.dataset.q,b.textContent); return; }
+    if(b.classList.contains('del')){ const c=catsLeer(); c.splice(Number(b.dataset.i),1); catsGuardar(c); chipsCategoriaBusqueda(); return; }
+    if(a==='ed'){ __catEdit=true; }
+    else if(a==='ok'){ __catEdit=false; }
+    else if(a==='add'){ __catForm=true; }
+    else if(a==='no'){ __catForm=false; }
+    else if(a==='rst'){ try{ localStorage.removeItem('cats_busq'); }catch(e){} }
+    else if(a==='gua2'){
+      const nom=(document.getElementById('catNom').value||'').trim(); let q=(document.getElementById('catQ').value||'').trim();
+      if(!q) q=nom.replace(/^[^\p{L}\p{N}]+/u,'').trim();
+      if(nom&&q){ const c=catsLeer(); c.push([nom,q]); catsGuardar(c); __catForm=false; } else return;
+    }
+    chipsCategoriaBusqueda();
+  };
   sugs.insertBefore(d,sugs.firstChild);
 }
 async function buscarCategoriaCerca(q,etiqueta){
