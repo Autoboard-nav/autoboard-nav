@@ -564,6 +564,8 @@ body.noche #radEd .chip{background:#2d353d;border-color:#3a434c;color:#e8edf2} b
   <button class="ajuste" id="btnTestTramo" style="background:#27384a">📏 Buscar radares de tramo cerca (50 km)</button>
   <div id="tramoDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste peligro" id="btnLimpiarFavs">🗑️ Limpiar favoritos</button>
+  <div class="seccion">Claves de servicios</div>
+  <button class="ajuste" id="btnClaves">🔑 Mis claves (MapTiler, TomTom, cargadores)</button>
   <div class="seccion">Enlace entre dispositivos</div>
   <input id="enlaceCodigo" type="text" maxlength="24" placeholder="Código (mín. 6 letras o números, igual en todas las apps)" autocomplete="off" autocapitalize="off" style="width:100%;box-sizing:border-box;border:1px solid #c5ccd3;border-radius:10px;padding:11px;font:600 15px system-ui,sans-serif;margin:2px 0 6px;background:#fff;color:#2f353b">
   <button class="ajuste" id="enlaceGenerar">🎲 Generar código nuevo</button>
@@ -583,7 +585,7 @@ body.noche #radEd .chip{background:#2d353d;border-color:#3a434c;color:#e8edf2} b
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v254 · AUTOPISTA (ruta habitual)</div>
+  <div class="seccion">Versión v255 · AUTOPISTA (claves propias)</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -670,9 +672,44 @@ body.noche #radEd .chip{background:#2d353d;border-color:#3a434c;color:#e8edf2} b
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
-const MAPTILER_KEY='zIBk9lClZVPouXIdGUTJ';
-const OCM_API_KEY='c597036e-f13e-4675-ae60-fe70feb86e2a';
-const TT='zMPqeYVXNoQw4rJ1ycr8QdywkDFNx0tF';
+/* ---- Claves de los servicios. Las propias (Ajustes → 🔑 Mis claves) se guardan en ESTE navegador y mandan sobre las de fábrica.
+   En la versión compartida las de fábrica van vacías y al abrir por primera vez se piden. ---- */
+const __CLAVES_DEF={maptiler:'zIBk9lClZVPouXIdGUTJ',tomtom:'zMPqeYVXNoQw4rJ1ycr8QdywkDFNx0tF',ocm:'c597036e-f13e-4675-ae60-fe70feb86e2a',ocm2:'b5874662-3951-4da6-90ba-ad65ed1c0156'};
+function claveUsuario(n){ try{ return (localStorage.getItem('clave_'+n)||'').trim(); }catch(e){ return ''; } }
+const MAPTILER_KEY=claveUsuario('maptiler')||__CLAVES_DEF.maptiler;
+const OCM_API_KEY=claveUsuario('ocm')||__CLAVES_DEF.ocm;
+const TT=claveUsuario('tomtom')||__CLAVES_DEF.tomtom;
+function mostrarClaves(oblig){
+  const old=document.getElementById('clavesPanel'); if(old) old.remove();
+  const campo=(id,tit,url,txt,oblig2)=>{ const usa=claveUsuario(id)?'usando la tuya':(__CLAVES_DEF[id]?'usando la de fábrica':'sin clave');
+    return '<div style="margin:10px 0 2px;font:700 14px system-ui,sans-serif">'+tit+(oblig2?' <span style="color:#ff8a80">(obligatoria)</span>':'')+' <span style="font-weight:400;color:#8d99a5;font-size:12px">· '+usa+'</span></div>'
+      +'<input id="cl_'+id+'" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="pega aquí tu clave" style="width:100%;box-sizing:border-box;padding:11px 12px;border-radius:10px;border:2px solid #3a434c;background:#2d353d;color:#e8edf2;font:15px system-ui,sans-serif">'
+      +'<div style="font-size:12px;margin-top:3px"><a href="'+url+'" target="_blank" rel="noopener" style="color:#6db3f2">'+txt+'</a></div>'; };
+  const d=document.createElement('div'); d.id='clavesPanel';
+  d.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(10,14,18,.92);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto';
+  d.innerHTML='<div style="background:#1c232b;color:#e8edf2;border-radius:16px;padding:18px;max-width:460px;width:100%;font-family:system-ui,sans-serif">'
+    +'<div style="font:800 19px system-ui,sans-serif;margin-bottom:4px">🔑 Mis claves</div>'
+    +'<div style="font-size:13px;color:#aeb8c2;line-height:1.45">'+(oblig?'Para usar el mapa necesitas tus propias claves (gratuitas). ':'')+'Se guardan solo en este navegador. Si lo dejas en blanco se usa la de fábrica, si existe.</div>'
+    +campo('maptiler','MapTiler (mapa)','https://cloud.maptiler.com/account/keys/','Conseguir clave de MapTiler',true)
+    +campo('tomtom','TomTom (rutas, tráfico, búsqueda)','https://my.tomtom.com/keys','Conseguir clave de TomTom',true)
+    +campo('ocm','OpenChargeMap (cargadores)','https://openchargemap.org/develop','Conseguir clave de OpenChargeMap',false)
+    +'<div id="clMsg" style="color:#ffb4b4;font-size:13px;min-height:18px;margin-top:8px"></div>'
+    +'<div style="display:flex;gap:8px;margin-top:6px"><button id="clGuardar" style="flex:2;padding:13px;border-radius:12px;border:0;background:#1e88e5;color:#fff;font:800 15px system-ui,sans-serif">Guardar y recargar</button>'
+    +(oblig?'':'<button id="clCerrar" style="flex:1;padding:13px;border-radius:12px;border:1px solid #3a434c;background:#2d353d;color:#d5dce3;font:800 15px system-ui,sans-serif">Cerrar</button>')+'</div>'
+    +'<button id="clBorrar" style="width:100%;margin-top:8px;padding:11px;border-radius:12px;border:1px solid #3a434c;background:transparent;color:#aeb8c2;font:700 13px system-ui,sans-serif">Quitar las claves guardadas aquí</button></div>';
+  document.documentElement.appendChild(d);
+  d.querySelector('#clGuardar').onclick=()=>{
+    const v={}; ['maptiler','tomtom','ocm'].forEach(k=>{ v[k]=(d.querySelector('#cl_'+k).value||'').trim(); });
+    if(!/^[A-Za-z0-9_\-]{12,}$/.test(v.maptiler||claveUsuario('maptiler')||__CLAVES_DEF.maptiler||'')){ d.querySelector('#clMsg').textContent='Falta la clave de MapTiler (o no parece válida).'; return; }
+    if(!/^[A-Za-z0-9_\-]{12,}$/.test(v.tomtom||claveUsuario('tomtom')||__CLAVES_DEF.tomtom||'')){ d.querySelector('#clMsg').textContent='Falta la clave de TomTom (o no parece válida).'; return; }
+    try{ ['maptiler','tomtom','ocm'].forEach(k=>{ if(v[k]) localStorage.setItem('clave_'+k,v[k]); }); }catch(e){ d.querySelector('#clMsg').textContent='No se pudo guardar en este navegador.'; return; }
+    location.reload();
+  };
+  d.querySelector('#clBorrar').onclick=()=>{ if(!confirm('¿Quitar las claves guardadas en este navegador?')) return; try{ ['maptiler','tomtom','ocm'].forEach(k=>localStorage.removeItem('clave_'+k)); }catch(e){} location.reload(); };
+  const c=d.querySelector('#clCerrar'); if(c) c.onclick=()=>d.remove();
+}
+window.mostrarClaves=mostrarClaves;
+if(!MAPTILER_KEY||!TT) mostrarClaves(true);
 const antialiasActivo=new URLSearchParams(location.search).get('aa')==='1';
 const errores=[];           /* máx. 40 entradas ({tipo,mensaje,n}); el total real está en window.__errTotal */
 window.__errTotal=0;
@@ -1659,6 +1696,7 @@ function repintarRutaConNiveles(){
   const features=segmentos.filter(s=>s.coords.length>=2).map(s=>({type:'Feature',geometry:{type:'LineString',coordinates:s.coords},properties:{nivel:(s.nivel|0)}}));
   map.getSource('ruta').setData({type:'FeatureCollection',features:features});
 }
+document.getElementById('btnClaves').onclick=()=>{ mostrarClaves(false); };
 document.getElementById('btnLimpiarFavs').onclick=()=>{if(!confirm('¿Borrar todos los cargadores favoritos?')) return;favoritos=[];guardarFavoritos();alert('Favoritos borrados.');};
 
 let simulando=false;
@@ -6092,7 +6130,7 @@ window.__pasos=(function(){
    (🟡 ≤22 · 🔵 ≤72 · 🟢 >72 · 🔴 Tesla), se piden de nuevo al moverse 3 km o cada 3 min. Tocar un icono abre la ficha (con estado, acceso y precio si OCM los tiene)
    y "Iniciar ruta". Aparte se piden los Superchargers de Tesla en 40 km (operador 23). */
 window.__carg=(function(){
-  const KEYS=['b5874662-3951-4da6-90ba-ad65ed1c0156', (typeof OCM_API_KEY!=='undefined'?OCM_API_KEY:'')].filter(Boolean);
+  const KEYS=[claveUsuario('ocm')?'':__CLAVES_DEF.ocm2, (typeof OCM_API_KEY!=='undefined'?OCM_API_KEY:'')].filter(Boolean);
   const rd=(k,d)=>{ try{ const v=localStorage.getItem(k); return v===null?d:v; }catch(e){ return d; } };
   const wr=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
   let cfg={ mapa:false, amarillo:true, azul:true, verde:true, tesla:true }; try{ Object.assign(cfg,JSON.parse(rd('carg_cfg','{}'))||{}); }catch(e){}
