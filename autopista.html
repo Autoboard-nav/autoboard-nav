@@ -103,6 +103,9 @@ body.noche #panelObras #obrasX{background:#343c45;color:#9aa5b1}
 #sugerencias{position:fixed;top:max(56px,calc(env(safe-area-inset-top) + 48px));right:12px;left:auto;z-index:26;background:#ffffff;border:0;border-radius:14px;box-shadow:0 6px 20px rgba(60,70,80,.28);width:var(--anchoPanel);min-width:0;max-width:calc(100vw - 24px);max-height:60vh;overflow-y:auto;display:none}
 #sugerencias.on{display:block}
 #sugerencias .sug{padding:11px 14px;color:#111111;font:600 15px system-ui,sans-serif;cursor:pointer;border-bottom:1px solid #eef1f4}
+#catChips{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px 6px}
+#catChips .catChip{border:0;border-radius:18px;padding:9px 13px;background:#eef1f4;color:#2f373f;font:700 14px system-ui,sans-serif;cursor:pointer}
+body.noche #catChips .catChip{background:#2d353d;color:#e8edf2}
 #sugerencias .sug:last-child{border-bottom:0}
 #sugerencias .sug:hover{background:#f1f4f7}
 #sugerencias .sug .sub{color:#6b7580;font-size:12px;margin-top:2px}
@@ -574,7 +577,7 @@ body.noche #radEd .chip{background:#2d353d;border-color:#3a434c;color:#e8edf2} b
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v251 · AUTOPISTA (radares editables)</div>
+  <div class="seccion">Versión v252 · AUTOPISTA (búsqueda por lugares)</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -1905,6 +1908,55 @@ function engancharRec(lista,repintar){
   });
 }
 
+/* ===== v252: búsqueda por lugares: nombre del sitio + categoría + distancia, y botones de categoría cerca de ti ===== */
+const CAT_NOMBRES={PETROL_STATION:'Gasolinera',RESTAURANT:'Restaurante',PHARMACY:'Farmacia',HOSPITAL_POLYCLINIC:'Hospital',CAFE_PUB:'Cafetería / bar',NIGHTLIFE:'Bar',MARKET:'Supermercado',SHOP:'Tienda',OPEN_PARKING_AREA:'Parking',PARKING_GARAGE:'Parking',ELECTRIC_VEHICLE_STATION:'Cargador',CASH_DISPENSER:'Cajero',BANK:'Banco',HOTEL_MOTEL:'Hotel',IMPORTANT_TOURIST_ATTRACTION:'Atractivo turístico',PLACE_OF_WORSHIP:'Iglesia / templo',MUSEUM:'Museo',COMMERCIAL_BUILDING:'Edificio',SCHOOL:'Colegio',UNIVERSITY:'Universidad',RAILWAY_STATION:'Estación de tren',BUS_STATION:'Estación de autobuses',AIRPORT:'Aeropuerto',PARK_RECREATION_AREA:'Parque',STADIUM:'Estadio',CINEMA:'Cine',THEATER:'Teatro',LIBRARY:'Biblioteca',POLICE_STATION:'Policía',POST_OFFICE:'Correos'};
+const CATS_BUSQ=[['⛽ Gasolineras','gasolinera'],['🍽️ Restaurantes','restaurante'],['☕ Bares','bar'],['💊 Farmacias','farmacia'],['🏥 Hospitales','hospital'],['🛒 Supermercados','supermercado'],['🅿️ Parkings','aparcamiento'],['🏧 Cajeros','cajero automático'],['🏨 Hoteles','hotel'],['🏛️ Turismo','monumento']];
+function nombreCategoriaPOI(s){
+  try{
+    const p=s.poi||{}, cl=(p.classifications&&p.classifications[0])||null;
+    if(cl&&cl.code&&CAT_NOMBRES[cl.code]) return CAT_NOMBRES[cl.code];
+    if(cl&&Array.isArray(cl.names)&&cl.names.length){ const es=cl.names.find(n=>/^es/i.test(n.nameLocale||'')); return (es||cl.names[0]).name||''; }
+    if(Array.isArray(p.categories)&&p.categories[0]) return p.categories[0];
+  }catch(e){}
+  return '';
+}
+function datosFilaBusqueda(s){
+  const a=s.address||{}, esPOI=!!(s.poi&&s.poi.name);
+  const calle=a.streetName?(a.streetName+(a.streetNumber?' '+a.streetNumber:'')):'';
+  const dist=(typeof s.dist==='number'&&s.dist>0)?fmtDistNav(s.dist):'';
+  if(esPOI) return {t:s.poi.name, sub:[nombreCategoriaPOI(s),calle,(a.municipality||a.localName||''),dist].filter(Boolean).join(' · ')};
+  return {t:a.freeformAddress||'', sub:dist};
+}
+function filaBusqueda(s,i){
+  const d=datosFilaBusqueda(s), yaFav=esFavDir(s.position.lat,s.position.lon)>=0;
+  return '<div class="sug sugRes" data-idx="'+i+'" style="display:flex;justify-content:space-between;align-items:center;gap:10px">'
+    +'<div style="flex:1;min-width:0"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHTML(d.t)+'</div>'
+    +(d.sub?'<div class="sub" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHTML(d.sub)+'</div>':'')+'</div>'
+    +'<button class="favBtn" data-idx="'+i+'" title="Guardar en favoritos" style="background:transparent;border:0;color:'+(yaFav?'#ffd166':'#8d99a5')+';font-size:22px;cursor:pointer;padding:6px 10px;flex:0 0 auto">'+(yaFav?'★':'☆')+'</button>'
+    +'</div>';
+}
+function chipsCategoriaBusqueda(){
+  const old=document.getElementById('catChips'); if(old) old.remove();
+  const d=document.createElement('div'); d.id='catChips';
+  d.innerHTML=CATS_BUSQ.map(c=>'<button class="catChip" data-q="'+c[1]+'">'+c[0]+'</button>').join('');
+  d.onclick=ev=>{ const b=ev.target.closest('.catChip'); if(b) buscarCategoriaCerca(b.dataset.q,b.textContent); };
+  sugs.insertBefore(d,sugs.firstChild);
+}
+async function buscarCategoriaCerca(q,etiqueta){
+  let la,lo;
+  if(typeof lastFix!=='undefined'&&lastFix){ la=lastFix.lat; lo=lastFix.lon; } else { const m=map.getCenter(); la=m.lat; lo=m.lng; }
+  sugs.innerHTML='<div class="sub" style="padding:12px 14px">Buscando '+escapeHTML(etiqueta)+'…</div>'; sugs.classList.add('on');
+  try{
+    const r=await fetch('https://api.tomtom.com/search/2/poiSearch/'+encodeURIComponent(q)+'.json?key='+TT+'&language=es-ES&lat='+la.toFixed(5)+'&lon='+lo.toFixed(5)+'&radius=25000&limit=15');
+    const j=await r.json();
+    const res=(j.results||[]).filter(x=>x&&x.position).sort((a,b)=>(a.dist||1e9)-(b.dist||1e9)).slice(0,12);
+    if(!res.length){ sugs.innerHTML='<div class="sug" style="color:#8d99a5;cursor:default">Sin resultados cerca para «'+escapeHTML(q)+'»</div>'; return; }
+    sugs.innerHTML='<div class="sub" style="padding:8px 14px 2px;font-weight:700;letter-spacing:.04em">'+escapeHTML(etiqueta.toUpperCase())+' · CERCA</div>'+res.map((s,i)=>filaBusqueda(s,i)).join('');
+    sugs.querySelectorAll('.sugRes').forEach(el=>{ el.onclick=ev=>{ if(ev.target.classList.contains('favBtn')) return; seleccionarSugerencia(res[Number(el.dataset.idx)]); }; });
+    sugs.querySelectorAll('.favBtn').forEach(btn=>{ btn.onclick=ev=>{ ev.stopPropagation(); const x=res[Number(btn.dataset.idx)]; toggleFavDir({nombre:(x.poi&&x.poi.name)||(x.address&&x.address.freeformAddress)||'Lugar',dir:(x.address&&x.address.freeformAddress)||'',lat:x.position.lat,lon:x.position.lon}); buscarCategoriaCerca(q,etiqueta); }; });
+  }catch(e){ sugs.innerHTML='<div class="sug" style="color:#8d99a5;cursor:default">No se pudo buscar ahora</div>'; try{ registrarError('busqueda-categoria',e.message); }catch(_){} }
+}
+{ const __pf=pintarFavoritos; pintarFavoritos=function(){ __pf.apply(this,arguments); try{ chipsCategoriaBusqueda(); }catch(e){} }; }
 function pintarFavoritos(){
   if(!favsDir.length && !camposFavs.length && !recientesFiltrados('',1).length){
     sugs.innerHTML = '<div class="sug" style="color:#8d99a5;cursor:default">Sin favoritos guardados.<br>Busca una dirección y pulsa ☆ para guardarla.</div>';
@@ -1966,25 +2018,13 @@ inputB.addEventListener('input',()=>{
   debounceTimer=setTimeout(()=>buscarSugerencias(q),250);
 });
 async function buscarSugerencias(q){
-  const url='https://api.tomtom.com/search/2/search/'+encodeURIComponent(q)+'.json?key='+TT+'&language=es-ES'+paisesQS()+sesgoQS()+'&limit=8&typeahead=true';
+  const url='https://api.tomtom.com/search/2/search/'+encodeURIComponent(q)+'.json?key='+TT+'&language=es-ES'+paisesQS()+sesgoQS()+'&limit=10&typeahead=true';
   try{
     const r=await fetch(url);
     const j=await r.json();
     const rf=recientesFiltrados(q,3);
     if(!j.results||!j.results.length){ if(rf.length){ sugs.innerHTML=recHTML(rf,false); sugs.classList.add('on'); engancharRec(rf,()=>buscarSugerencias(q)); return; } sugs.innerHTML='<div class="sug" style="color:#8d99a5">Sin resultados</div>';sugs.classList.add('on');return;}
-    sugs.innerHTML=recHTML(rf,false)+j.results.map((s,i)=>{
-      const direccion=s.address?(s.address.freeformAddress||''):(s.poi?s.poi.name:'');
-      const sub=s.poi&&s.poi.name?s.poi.name:'';
-      const lat=s.position.lat, lon=s.position.lon;
-      const yaFav = esFavDir(lat,lon) >= 0;
-      const estrella = yaFav ? '★' : '☆';
-      const colorEstrella = yaFav ? '#ffd166' : '#8d99a5';
-      return '<div class="sug sugRes" data-idx="'+i+'" style="display:flex;justify-content:space-between;align-items:center;gap:10px">'
-        +'<div style="flex:1;min-width:0"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHTML(direccion)+'</div>'
-        +(sub?'<div class="sub" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHTML(sub)+'</div>':'')+'</div>'
-        +'<button class="favBtn" data-idx="'+i+'" title="Guardar en favoritos" style="background:transparent;border:0;color:'+colorEstrella+';font-size:22px;cursor:pointer;padding:6px 10px;flex:0 0 auto">'+estrella+'</button>'
-        +'</div>';
-    }).join('');
+    sugs.innerHTML=recHTML(rf,false)+j.results.map((s,i)=>filaBusqueda(s,i)).join('');
     sugs.classList.add('on');
     engancharRec(rf,()=>buscarSugerencias(q));
     sugs.querySelectorAll('.sugRes').forEach(el=>{
