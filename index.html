@@ -588,7 +588,7 @@ body.noche #radEd .chip{background:#2d353d;border-color:#3a434c;color:#e8edf2} b
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v265 · AUTOPISTA (app única, 3D apagado por defecto)</div>
+  <div class="seccion">Versión v266 · AUTOPISTA (app única, 3D apagado por defecto)</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -2410,7 +2410,10 @@ function fotoCarrilPara(s){
   const n=s.lanes.length, act=[]; s.lanes.forEach((l,i)=>{ if(l&&l.lane&&l.lane.active) act.push(i); });
   if(n<2||n>5||!act.length||act.length===n) return null;
   const mod=String(s.maneuver.modifier||'straight'), lado=/right/.test(mod)?'derecha':(/left/.test(mod)?'izquierda':'frente'), k=n+'|'+act.join(',');
-  const f=s.hw ? (((FOTOS_CARRIL_AUTO[lado]||{})[k])||((FOTOS_CARRIL_CARR[lado]||{})[k])) : (FOTOS_CARRIL_CARR[lado]||{})[k];
+  /* Autopista: antiguas azules; si falta el caso, las urbanas azules. Carretera: urbanas con carril blanco y flechas negras (rc-nv-*); si falta el caso, las antiguas recoloreadas (rc-*) */
+  let f;
+  if(s.hw){ f=((FOTOS_CARRIL_AUTO[lado]||{})[k])||((FOTOS_CARRIL_CARR[lado]||{})[k]); }
+  else { const u=(FOTOS_CARRIL_CARR[lado]||{})[k], a=(FOTOS_CARRIL_AUTO[lado]||{})[k]; f=u?('rc-'+u):(a?('rc-'+a):null); }
   return f?'carriles/'+f+'.jpg':null;
 }
 function actualizarFotoCarril(s){
