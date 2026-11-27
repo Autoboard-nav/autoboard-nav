@@ -509,6 +509,7 @@ body.noche #radEd .chip{background:#2d353d;border-color:#3a434c;color:#e8edf2} b
   <button class="ajuste on" id="btnAvisosRadares">📸 Avisos radares: ON</button>
   <button class="ajuste on" id="btnObras">🚧 Avisos de obras y cortes: ON</button>
   <button class="ajuste on" id="btnIncOfVoz">🚨 Avisos de accidentes y retenciones (oficial): ON</button>
+  <button class="ajuste on" id="btnIncOfMapa">📍 Incidencias oficiales en el mapa: ON</button>
   <div class="seccion">Cargadores</div>
   <button class="ajuste" id="btnListaCargadores">⚡ Ver los 10 más cercanos (según filtros)</button>
   <button class="ajuste on" id="btnCargMapa">⚡ Cargadores en el mapa: ON</button>
@@ -607,7 +608,7 @@ body.noche #radEd .chip{background:#2d353d;border-color:#3a434c;color:#e8edf2} b
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v270 · AUTOPISTA (app única, 3D apagado por defecto)</div>
+  <div class="seccion">Versión v271 · AUTOPISTA (app única, 3D apagado por defecto)</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -2539,7 +2540,9 @@ async function incOfCargar(){
     const com=vals.sort((a,b)=>b.length-a.length)[0]||'';
     lista.push({lat,lon,tipo,via:g('roadNumber'),com,ini:isFinite(ti)?ti:0});
   }
-  __incOf={t:Date.now(),lista}; return lista;
+  /* quita repetidos del propio feed (mismo tipo a menos de 80 m: suele venir una vez por sentido) */
+  const u=[]; for(const x of lista){ if(!u.some(y=>y.tipo===x.tipo&&dist([y.lat,y.lon],[x.lat,x.lon])<80)) u.push(x); }
+  __incOf={t:Date.now(),lista:u}; return u;
 }
 function incOfEscape(x){ return String(x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 async function incOfAbrir(){
@@ -2547,7 +2550,7 @@ async function incOfAbrir(){
   if(panel.classList.contains('on')){ panel.classList.remove('on'); b.classList.remove('abierto'); return; }
   panel.classList.add('on'); b.classList.add('abierto'); cont.innerHTML='<div class="vacio">Leyendo incidencias…</div>'; info.textContent='';
   try{
-    const lista=await incOfCargar();
+    const lista=(await incOfCargar()).filter(x=>!incOfDupTT(x));
     const ref=lastFix?[lastFix.lat,lastFix.lon]:(()=>{ const c=map.getCenter(); return [c.lat,c.lng]; })();
     const cerca=lista.map(x=>Object.assign({d:dist(ref,[x.lat,x.lon])/1000,niv:incOfTipoES(x.tipo)[1],nom:incOfTipoES(x.tipo)[0]},x)).filter(x=>x.d<=INCOF_RADIO_KM);
     cerca.sort((a,b)=>(a.niv-b.niv)||(a.d-b.d));
@@ -2576,7 +2579,7 @@ async function incOfVozTick(){
     if(!INCOF_VOZ.on||!lastFix||!(speedKmh>15)||!window.__voz) return;
     const ahora=Date.now();
     if(ahora-INCOF_VOZ.ultT>=INCOF_VOZ.cadaMs){ INCOF_VOZ.ultT=ahora; try{ await incOfCargar(); }catch(e){ return; } }
-    const lista=__incOf.lista; if(!lista) return;
+    const lista=__incOf.lista&&__incOf.lista.filter(x=>!incOfDupTT(x)); if(!lista) return;
     const pos=[lastFix.lat,lastFix.lon];
     let mejor=null;
     for(const x of lista){
@@ -2596,6 +2599,41 @@ async function incOfVozTick(){
 { const b=document.getElementById('btnIncOfVoz'); const t=()=>{ if(b){ b.textContent='🚨 Avisos de accidentes y retenciones (oficial): '+(INCOF_VOZ.on?'ON':'OFF'); b.classList.toggle('on',INCOF_VOZ.on); } };
   if(b) b.onclick=()=>{ INCOF_VOZ.on=!INCOF_VOZ.on; try{ localStorage.setItem('incof_voz',INCOF_VOZ.on?'1':'0'); }catch(e){} t(); };
   t(); setInterval(incOfVozTick,15000); }
+
+/* v271: marcadores de las incidencias oficiales en el mapa (rojo: accidente/retención/obstrucción/corte; naranja: condiciones de la vía; gris: obras) y filtro de duplicados con el módulo de obras y cortes de TomTom en ruta */
+const INCOF_MAP={on:(()=>{ try{ return localStorage.getItem('incof_mapa')!=='0'; }catch(e){ return true; } })(), marcas:[], maxKm:30, cadaMs:300000};
+function incOfDupTT(x){
+  try{
+    if(incOfTipoES(x.tipo)[1]<3 && x.tipo!=='RoadOrCarriagewayOrLaneManagement') return false;   /* accidentes y retenciones nunca los cubre TomTom en ruta */
+    const L=(window.__obras&&__obras.lineas&&__obras.lineas())||[];
+    for(const ln of L){ for(const q of ln){ if(dist([x.lat,x.lon],[q[1],q[0]])<150) return true; } }
+  }catch(e){} return false;
+}
+function incOfIcono(t){ return ({Accident:'💥',VehicleObstruction:'🚗',AbnormalTraffic:'🐢',RoadOrCarriagewayOrLaneManagement:'⛔',GeneralObstruction:'⚠️',AnimalPresenceObstruction:'🐄',ConstructionWorks:'🚧',MaintenanceWorks:'🚧'})[t]||'⚠️'; }
+function incOfPintarMarcas(){
+  try{
+    INCOF_MAP.marcas.forEach(m=>m.remove()); INCOF_MAP.marcas=[];
+    if(!INCOF_MAP.on||!__incOf.lista||!window.maplibregl||!window.map) return;
+    const ref=lastFix?[lastFix.lat,lastFix.lon]:(()=>{ const c=map.getCenter(); return [c.lat,c.lng]; })();
+    for(const x of __incOf.lista){
+      const niv=incOfTipoES(x.tipo)[1]; if(niv>3||incOfDupTT(x)) continue;
+      if(dist(ref,[x.lat,x.lon])>INCOF_MAP.maxKm*1000) continue;
+      const el=document.createElement('div'); el.className='incMarca '+(niv===1?'':niv===2?'media':'obra'); el.textContent=incOfIcono(x.tipo);
+      const txt='<b>'+incOfEscape(incOfTipoES(x.tipo)[0])+(x.via?' · '+incOfEscape(x.via):'')+'</b><br>'+incOfEscape(x.com.slice(0,140));
+      INCOF_MAP.marcas.push(new maplibregl.Marker({element:el,anchor:'center'}).setLngLat([x.lon,x.lat]).setPopup(new maplibregl.Popup({offset:18,closeButton:false,maxWidth:'240px'}).setHTML('<div style="font:600 12px system-ui;color:#111">'+txt+'</div>')).addTo(map));
+    }
+  }catch(e){}
+}
+async function incOfMapaTick(){
+  try{
+    if(!INCOF_MAP.on||document.visibilityState==='hidden'||!window.map) return;
+    if(!__incOf.lista||Date.now()-__incOf.t>=INCOF_MAP.cadaMs) await incOfCargar();
+    incOfPintarMarcas();
+  }catch(e){}
+}
+{ const b=document.getElementById('btnIncOfMapa'); const t=()=>{ if(b){ b.textContent='📍 Incidencias oficiales en el mapa: '+(INCOF_MAP.on?'ON':'OFF'); b.classList.toggle('on',INCOF_MAP.on); } };
+  if(b) b.onclick=()=>{ INCOF_MAP.on=!INCOF_MAP.on; try{ localStorage.setItem('incof_mapa',INCOF_MAP.on?'1':'0'); }catch(e){} t(); if(INCOF_MAP.on) incOfMapaTick(); else incOfPintarMarcas(); };
+  t(); setTimeout(incOfMapaTick,5000); setInterval(incOfMapaTick,60000); }
 /* v267: tamaño de pantalla (mapa, iconos, velocímetro, letras y ajustes a la vez). 100 % = como siempre. */
 (function(){
   const OPC=[100,110,120,135,150], b=document.getElementById('btnZoomUI'); if(!b) return;
@@ -7142,7 +7180,7 @@ window.__obras=(function(){
   }
   function esperar(){ if(window.map&&map.on&&typeof recorridoAhora==='function') iniciar(); else setTimeout(esperar,400); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',esperar); else esperar();
-  return {estado:()=>({on,estadoTxt,lista:lista.map(o=>({cat:o.cat,sIni:Math.round(o.sIni),sFin:Math.round(o.sFin),desc:o.desc}))}),consultar,tick};
+  return {lineas:()=>(on?lista.map(o=>o.linea):[]),estado:()=>({on,estadoTxt,lista:lista.map(o=>({cat:o.cat,sIni:Math.round(o.sIni),sFin:Math.round(o.sFin),desc:o.desc}))}),consultar,tick};
 })();
 </script>
 <script>
@@ -8101,6 +8139,10 @@ body.modo-solomapa #btnIncOf,body.modo-solomapa #listaIncOf{display:none}
 #listaIncOf .incItem .tt{font-weight:800;color:#e8eef2;font-size:11px;line-height:1.2}
 #listaIncOf .incItem .dd{color:#fff;font-weight:800;font-size:10px;flex:0 0 auto}
 #listaIncOf .incItem .cc{color:#9aa5b1;font-size:10px;line-height:1.25;word-break:break-word}
+.incMarca{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;line-height:1;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.55);cursor:pointer;background:#e53935}
+.incMarca.media{background:#fb8c00}
+.incMarca.obra{background:#78909c;width:24px;height:24px;font-size:13px;border-width:2px}
+body.modo-solomapa .incMarca{display:none}
 #listaIncOf .vacio{color:#9aa5b1;font-size:11px;padding:10px 8px}
 
 #btnParkMapa.on,#btnParkMapa.abierto,#btnCarg.abierto{box-shadow:0 0 0 3px #fff,0 0 0 5px #1e9e4a}
