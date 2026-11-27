@@ -508,6 +508,7 @@ body.noche #radEd .chip{background:#2d353d;border-color:#3a434c;color:#e8edf2} b
   <div class="seccion">Avisos</div>
   <button class="ajuste on" id="btnAvisosRadares">📸 Avisos radares: ON</button>
   <button class="ajuste on" id="btnObras">🚧 Avisos de obras y cortes: ON</button>
+  <button class="ajuste on" id="btnIncOfVoz">🚨 Avisos de accidentes y retenciones (oficial): ON</button>
   <div class="seccion">Cargadores</div>
   <button class="ajuste" id="btnListaCargadores">⚡ Ver los 10 más cercanos (según filtros)</button>
   <button class="ajuste on" id="btnCargMapa">⚡ Cargadores en el mapa: ON</button>
@@ -606,7 +607,7 @@ body.noche #radEd .chip{background:#2d353d;border-color:#3a434c;color:#e8edf2} b
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v269 · AUTOPISTA (app única, 3D apagado por defecto)</div>
+  <div class="seccion">Versión v270 · AUTOPISTA (app única, 3D apagado por defecto)</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -2564,6 +2565,37 @@ async function incOfAbrir(){
   }
 }
 { const b=document.getElementById('btnIncOf'); if(b) b.onclick=incOfAbrir; const c=document.getElementById('btnCerrarIncOf'); if(c) c.onclick=()=>{ document.getElementById('listaIncOf').classList.remove('on'); document.getElementById('btnIncOf').classList.remove('abierto'); }; }
+
+/* v270: aviso de voz de incidencias oficiales graves (accidente, retención, obstrucción, corte) por delante. Una vez por incidencia. Solo con la app en marcha y rodando. */
+const INCOF_VOZ={on:(()=>{ try{ return localStorage.getItem('incof_voz')!=='0'; }catch(e){ return true; } })(), cadaMs:300000, ultT:0, ultVoz:0, dicho:Object.create(null), maxKm:6, cono:50, maxEdadH:8, tipos:{Accident:'accidente',VehicleObstruction:'vehículo obstruyendo la vía',AbnormalTraffic:'retención',RoadOrCarriagewayOrLaneManagement:'corte de carril',GeneralObstruction:'obstrucción en la vía',AnimalPresenceObstruction:'animales en la vía'}};
+function incOfRumbo(a,b){ const r=Math.PI/180, y=Math.sin((b[1]-a[1])*r)*Math.cos(b[0]*r), x=Math.cos(a[0]*r)*Math.sin(b[0]*r)-Math.sin(a[0]*r)*Math.cos(b[0]*r)*Math.cos((b[1]-a[1])*r); return (Math.atan2(y,x)/r+360)%360; }
+function incOfTxtDist(m){ if(m>=1000){ const k=Math.round(m/100)/10; return k.toString().replace('.',',')+' kilómetros'; } return Math.max(100,Math.round(m/100)*100)+' metros'; }
+function incOfViaVoz(v){ return String(v||'').replace(/-/g,' ').replace(/\s+/g,' ').trim(); }
+async function incOfVozTick(){
+  try{
+    if(!INCOF_VOZ.on||!lastFix||!(speedKmh>15)||!window.__voz) return;
+    const ahora=Date.now();
+    if(ahora-INCOF_VOZ.ultT>=INCOF_VOZ.cadaMs){ INCOF_VOZ.ultT=ahora; try{ await incOfCargar(); }catch(e){ return; } }
+    const lista=__incOf.lista; if(!lista) return;
+    const pos=[lastFix.lat,lastFix.lon];
+    let mejor=null;
+    for(const x of lista){
+      if(!INCOF_VOZ.tipos[x.tipo]) continue;
+      if(x.ini && ahora-x.ini>INCOF_VOZ.maxEdadH*3600000) continue;
+      const k=x.tipo+'|'+x.lat.toFixed(3)+'|'+x.lon.toFixed(3)+'|'+x.ini; if(INCOF_VOZ.dicho[k]) continue;
+      const d=dist(pos,[x.lat,x.lon]); if(d>INCOF_VOZ.maxKm*1000) continue;
+      if(d>150){ let df=Math.abs(incOfRumbo(pos,[x.lat,x.lon])-heading)%360; if(df>180) df=360-df; if(df>INCOF_VOZ.cono) continue; }
+      if(!mejor||d<mejor.d) mejor={x,d,k};
+    }
+    if(!mejor||ahora-INCOF_VOZ.ultVoz<45000) return;
+    INCOF_VOZ.dicho[mejor.k]=1; INCOF_VOZ.ultVoz=ahora;
+    const v=incOfViaVoz(mejor.x.via);
+    __voz.decir('Atención, '+INCOF_VOZ.tipos[mejor.x.tipo]+(v?' en la '+v:'')+', a '+incOfTxtDist(mejor.d),false);
+  }catch(e){}
+}
+{ const b=document.getElementById('btnIncOfVoz'); const t=()=>{ if(b){ b.textContent='🚨 Avisos de accidentes y retenciones (oficial): '+(INCOF_VOZ.on?'ON':'OFF'); b.classList.toggle('on',INCOF_VOZ.on); } };
+  if(b) b.onclick=()=>{ INCOF_VOZ.on=!INCOF_VOZ.on; try{ localStorage.setItem('incof_voz',INCOF_VOZ.on?'1':'0'); }catch(e){} t(); };
+  t(); setInterval(incOfVozTick,15000); }
 /* v267: tamaño de pantalla (mapa, iconos, velocímetro, letras y ajustes a la vez). 100 % = como siempre. */
 (function(){
   const OPC=[100,110,120,135,150], b=document.getElementById('btnZoomUI'); if(!b) return;
