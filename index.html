@@ -483,6 +483,14 @@ body.noche #radEd .chip{background:#2d353d;border-color:#3a434c;color:#e8edf2} b
   </div>
   <div id="listaCargadoresItems"></div>
 </div>
+<div id="listaIncOf">
+  <div class="cabecera">
+    <h2>🚧 Incidencias cercanas</h2>
+    <button class="cerrarLista" id="btnCerrarIncOf"><svg class="xsvg" viewBox="0 0 12 12" width="1em" height="1em" aria-hidden="true"><path d="M2 2L10 10M10 2L2 10" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg></button>
+  </div>
+  <div id="listaIncOfInfo"></div>
+  <div id="listaIncOfItems"></div>
+</div>
 <div id="celebracion"></div>
 
 <div id="panelAjustes">
@@ -598,7 +606,7 @@ body.noche #radEd .chip{background:#2d353d;border-color:#3a434c;color:#e8edf2} b
   <button class="ajuste" id="btnFluidez" style="background:#27384a">📊 Medir fluidez al conducir (60 s)</button>
   <div id="fluDiag" style="font-size:11px;opacity:.9;padding:2px 14px;white-space:pre-wrap"></div>
   <button class="ajuste on" id="btnWake">💡 Pantalla siempre encendida: ON</button>
-  <div class="seccion">Versión v268 · AUTOPISTA (app única, 3D apagado por defecto)</div>
+  <div class="seccion">Versión v269 · AUTOPISTA (app única, 3D apagado por defecto)</div>
   <div class="info" style="font-size:10px;opacity:.6;padding:2px 14px 8px">Modelo 3D Tesla Supercharger: «Tesla Charging Station» de Sketcher (Sketchfab), licencia CC BY 4.0.</div>
 </div>
 
@@ -672,6 +680,7 @@ body.noche #radEd .chip{background:#2d353d;border-color:#3a434c;color:#e8edf2} b
 
 <button class="botonMapa" id="btnLimpio" title="Modo limpio y fluido">🍃</button>
 <button class="botonMapa" id="btnParkMapa" title="Parkings">P</button>
+<button class="botonMapa" id="btnIncOf" title="Incidencias de tráfico cercanas (oficial)">🚧</button>
 <div id="apLista"></div>
 <div id="tramoCard"><div class="l" id="tcLim">–</div><div><div id="tcT1">Tramo</div><div class="m" id="tcT2"></div></div></div>
 <div id="sugDestino"><div class="tx"><div class="t1"></div><div class="t2"></div></div><button class="ir">Ir</button><button class="no" title="Ocultar">✕</button></div>
@@ -2496,6 +2505,65 @@ async function probarTraficoGV(){
   }
 }
 { const b=document.getElementById('btnTraficoGV'); if(b) b.onclick=probarTraficoGV; }
+
+/* v269: lista de incidencias oficiales cercanas (Gobierno Vasco). Solo informa: sin voz ni marcadores. Se actualiza al abrir (caché 60 s). */
+const INCOF_RADIO_KM=20;
+let __incOf={t:0,lista:null};
+function incOfTipoES(t){
+  const m={Accident:['Accidente',1],VehicleObstruction:['Vehículo obstruyendo',1],AbnormalTraffic:['Retención / tráfico anormal',1],
+    RoadOrCarriagewayOrLaneManagement:['Corte o carril cerrado',1],GeneralObstruction:['Obstrucción en la vía',1],AnimalPresenceObstruction:['Animales en la vía',1],
+    EnvironmentalObstruction:['Obstáculo en la vía',1],PoorEnvironmentConditions:['Mal tiempo / condiciones',2],NonWeatherRelatedRoadConditions:['Estado de la vía',2],
+    ConstructionWorks:['Obras',3],MaintenanceWorks:['Mantenimiento',3],Activities:['Actividad',4],SpeedManagement:['Límite de velocidad',4],GeneralNetworkManagement:['Gestión de tráfico',4]};
+  return m[t]||[t,2];
+}
+async function incOfCargar(){
+  if(__incOf.lista && Date.now()-__incOf.t<60000) return __incOf.lista;
+  const ac=new AbortController(); const to=setTimeout(()=>ac.abort(),15000);
+  let r; try{ r=await fetch(TRAFICO_GV_URL,{cache:'no-store',signal:ac.signal}); } finally{ clearTimeout(to); }
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const doc=new DOMParser().parseFromString(await r.text(),'application/xml');
+  if(doc.getElementsByTagName('parsererror').length) throw new Error('no es XML válido');
+  const ahora=Date.now(), lista=[];
+  for(const e of Array.from(doc.getElementsByTagNameNS('*','situationRecord'))){
+    const g=n=>{ const x=e.getElementsByTagNameNS('*',n)[0]; return x?x.textContent.trim():''; };
+    const lat=parseFloat(g('latitude')), lon=parseFloat(g('longitude'));
+    if(!isFinite(lat)||!isFinite(lon)) continue;
+    const st=g('validityStatus'); if(st && st!=='active') continue;
+    const ini=g('overallStartTime'), ti=ini?Date.parse(ini):NaN;
+    if(isFinite(ti) && ti>ahora+60000) continue;
+    const fin=g('overallEndTime'), tf=fin?Date.parse(fin):NaN;
+    if(isFinite(tf) && tf<ahora) continue;
+    const tipo=(e.getAttribute('xsi:type')||e.getAttributeNS('http://www.w3.org/2001/XMLSchema-instance','type')||e.localName||'?').replace(/^.*:/,'');
+    const vals=Array.from(e.getElementsByTagNameNS('*','value')).map(v=>v.textContent.trim()).filter(Boolean);
+    const com=vals.sort((a,b)=>b.length-a.length)[0]||'';
+    lista.push({lat,lon,tipo,via:g('roadNumber'),com,ini:isFinite(ti)?ti:0});
+  }
+  __incOf={t:Date.now(),lista}; return lista;
+}
+function incOfEscape(x){ return String(x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+async function incOfAbrir(){
+  const panel=document.getElementById('listaIncOf'), cont=document.getElementById('listaIncOfItems'), info=document.getElementById('listaIncOfInfo'), b=document.getElementById('btnIncOf');
+  if(panel.classList.contains('on')){ panel.classList.remove('on'); b.classList.remove('abierto'); return; }
+  panel.classList.add('on'); b.classList.add('abierto'); cont.innerHTML='<div class="vacio">Leyendo incidencias…</div>'; info.textContent='';
+  try{
+    const lista=await incOfCargar();
+    const ref=lastFix?[lastFix.lat,lastFix.lon]:(()=>{ const c=map.getCenter(); return [c.lat,c.lng]; })();
+    const cerca=lista.map(x=>Object.assign({d:dist(ref,[x.lat,x.lon])/1000,niv:incOfTipoES(x.tipo)[1],nom:incOfTipoES(x.tipo)[0]},x)).filter(x=>x.d<=INCOF_RADIO_KM);
+    cerca.sort((a,b)=>(a.niv-b.niv)||(a.d-b.d));
+    const hh=new Date(__incOf.t).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    info.textContent='Gobierno Vasco · a menos de '+INCOF_RADIO_KM+' km · leído a las '+hh+' (el feed se actualiza cada ~9 min)';
+    if(!cerca.length){ cont.innerHTML='<div class="vacio">Sin incidencias activas cerca.</div>'; return; }
+    cont.innerHTML=cerca.map((x,i)=>{
+      const desde=x.ini?new Date(x.ini).toLocaleString('es-ES',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+      return '<div class="incItem '+(x.niv===1?'grave':x.niv===2?'media':'')+'" data-i="'+i+'"><div class="f1"><span class="tt">'+incOfEscape(x.nom)+(x.via?' · '+incOfEscape(x.via):'')+'</span><span class="dd">'+x.d.toFixed(1)+' km</span></div>'
+        +'<div class="cc">'+(desde?'desde '+desde+(x.com?' · ':''):'')+incOfEscape(x.com.slice(0,110))+'</div></div>';
+    }).join('');
+    cont.querySelectorAll('.incItem').forEach(el=>{ el.onclick=()=>{ const x=cerca[+el.dataset.i]; try{ map.flyTo({center:[x.lon,x.lat],zoom:Math.max(map.getZoom(),15)}); }catch(e){} }; });
+  }catch(e){
+    cont.innerHTML='<div class="vacio">❌ No pude leer las incidencias: '+incOfEscape((e&&e.name==='AbortError')?'tardó más de 15 s':(e&&e.message)||e)+'</div>';
+  }
+}
+{ const b=document.getElementById('btnIncOf'); if(b) b.onclick=incOfAbrir; const c=document.getElementById('btnCerrarIncOf'); if(c) c.onclick=()=>{ document.getElementById('listaIncOf').classList.remove('on'); document.getElementById('btnIncOf').classList.remove('abierto'); }; }
 /* v267: tamaño de pantalla (mapa, iconos, velocímetro, letras y ajustes a la vez). 100 % = como siempre. */
 (function(){
   const OPC=[100,110,120,135,150], b=document.getElementById('btnZoomUI'); if(!b) return;
@@ -7982,6 +8050,27 @@ function suavizarLinea(coords, pasadas){
 #btnParkMapa{position:fixed;right:14px;bottom:120px;z-index:20;background:#1565c0;border-color:#fff;color:#fff;font:800 27px system-ui,Arial,sans-serif;line-height:1}
 body.noche #btnParkMapa{background:#1565c0;border-color:#fff;color:#fff}
 body.modo-solomapa #btnParkMapa,body.modo-solomapa #apLista{display:none}
+/* v269: incidencias oficiales (Gobierno Vasco, DATEX II vía Worker): icono + lista de cercanas (solo lista, sin voz ni marcadores) */
+#btnIncOf{position:fixed;right:14px;bottom:172px;z-index:20;font-size:23px;line-height:1}
+#btnIncOf.abierto{box-shadow:0 0 0 3px #fff,0 0 0 5px #e53935}
+body.modo-solomapa #btnIncOf,body.modo-solomapa #listaIncOf{display:none}
+#listaIncOf{position:fixed;top:76px;left:10px;z-index:35;width:300px;max-height:calc((100vh - 100px)/var(--uiz,1));background:rgba(10,13,16,.94);border:2px solid #8a3b3b;border-radius:12px;display:none;flex-direction:column;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.6)}
+#listaIncOf.on{display:flex}
+#listaIncOf .cabecera{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#0f1318;border-bottom:1px solid #232c33;flex:0 0 auto}
+#listaIncOf h2{color:#ffb4b4;margin:0;font-size:12px;font-weight:800;letter-spacing:.5px;text-transform:uppercase}
+#listaIncOf .cerrarLista{background:transparent;border:0;color:#ff8a8a;font-size:16px;font-weight:900;cursor:pointer;padding:2px 6px;line-height:1}
+#listaIncOfInfo{color:#8d99a5;font-size:10px;padding:5px 10px 0}
+#listaIncOfItems{overflow-y:auto;padding:6px;flex:1 1 auto}
+#listaIncOf .incItem{background:#12161c;border-radius:8px;padding:7px 8px;margin-bottom:6px;cursor:pointer;border-left:4px solid #8d99a5}
+#listaIncOf .incItem:active{background:#1d262f}
+#listaIncOf .incItem.grave{border-left-color:#e53935}
+#listaIncOf .incItem.media{border-left-color:#fb8c00}
+#listaIncOf .incItem .f1{display:flex;justify-content:space-between;gap:6px;margin-bottom:2px}
+#listaIncOf .incItem .tt{font-weight:800;color:#e8eef2;font-size:11px;line-height:1.2}
+#listaIncOf .incItem .dd{color:#fff;font-weight:800;font-size:10px;flex:0 0 auto}
+#listaIncOf .incItem .cc{color:#9aa5b1;font-size:10px;line-height:1.25;word-break:break-word}
+#listaIncOf .vacio{color:#9aa5b1;font-size:11px;padding:10px 8px}
+
 #btnParkMapa.on,#btnParkMapa.abierto,#btnCarg.abierto{box-shadow:0 0 0 3px #fff,0 0 0 5px #1e9e4a}
 #btnCarg.ap3dv{color:#fff;background:#1e9e4a;border-color:#1e9e4a}
 #popupCargador{max-height:70vh;overflow-y:auto}
